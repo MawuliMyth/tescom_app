@@ -25,9 +25,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8FAFF),
       body: SafeArea(
-        child: LayoutBuilder(
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFFFFFFFF),
+                Color(0xFFF4F8FF),
+                Color(0xFFF7F6FF),
+              ],
+            ),
+          ),
+          child: LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
 
@@ -118,6 +130,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
             );
           },
+          ),
         ),
       ),
     );
@@ -163,7 +176,7 @@ class _SignUpInput extends StatelessWidget {
                 size: 20,
               ),
         filled: true,
-        fillColor: const Color(0xFFF6F6F6),
+        fillColor: Colors.white.withValues(alpha: 0.68),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 22,
           vertical: 16,
@@ -218,7 +231,7 @@ class _PhoneInput extends StatelessWidget {
           ),
         ),
         filled: true,
-        fillColor: const Color(0xFFF6F6F6),
+        fillColor: Colors.white.withValues(alpha: 0.68),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 16,
@@ -272,7 +285,7 @@ class _InstitutionDropdown extends StatelessWidget {
           letterSpacing: 0,
         ),
         filled: true,
-        fillColor: const Color(0xFFF6F6F6),
+        fillColor: Colors.white.withValues(alpha: 0.68),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 22,
           vertical: 16,

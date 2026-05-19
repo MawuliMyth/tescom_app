@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:tescon_app/screens/sigin_screen.dart';
@@ -41,13 +43,11 @@ class OnboardingScreen extends StatelessWidget {
                       children: [
                         Transform.rotate(
                           angle: -0.2,
-                          child: Container(
+                          child: _OnboardingGlass(
                             width: width * 0.68,
                             height: height * 0.28,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.09),
-                              borderRadius: BorderRadius.circular(36),
-                            ),
+                            borderRadius: 36,
+                            child: const SizedBox.expand(),
                           ),
                         ),
                         Positioned(
@@ -103,26 +103,23 @@ class OnboardingScreen extends StatelessWidget {
                   SizedBox(
                     width: width * 0.54,
                     height: 48,
-                    child: FilledButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, SiginScreen.id);
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white.withValues(alpha: 0.08),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(26),
-                          side: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.2),
+                    child: _OnboardingGlass(
+                      borderRadius: 26,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.pushNamed(context, SiginScreen.id);
+                        },
+                        borderRadius: BorderRadius.circular(26),
+                        child: Center(
+                          child: Text(
+                            'Get Started',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0,
+                            ),
                           ),
-                        ),
-                      ),
-                      child: Text(
-                        'Get Started',
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0,
                         ),
                       ),
                     ),
@@ -132,6 +129,50 @@ class OnboardingScreen extends StatelessWidget {
               );
             },
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OnboardingGlass extends StatelessWidget {
+  const _OnboardingGlass({
+    required this.child,
+    required this.borderRadius,
+    this.width,
+    this.height,
+  });
+
+  final Widget child;
+  final double borderRadius;
+  final double? width;
+  final double? height;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(borderRadius),
+            color: Colors.white.withValues(alpha: 0.12),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.22),
+            ),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withValues(alpha: 0.22),
+                Colors.white.withValues(alpha: 0.06),
+              ],
+            ),
+          ),
+          child: child,
         ),
       ),
     );
