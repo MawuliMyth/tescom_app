@@ -15,6 +15,20 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF34368C),
+          brightness: Brightness.light,
+        ),
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: ZoomPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          },
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF8FAFF),
+        useMaterial3: true,
+      ),
       initialRoute: OnboardingScreen.id,
       routes: {
         OnboardingScreen.id: (context) => const OnboardingScreen(),

@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:tescon_app/screens/sigin_screen.dart';
@@ -43,7 +41,7 @@ class OnboardingScreen extends StatelessWidget {
                       children: [
                         Transform.rotate(
                           angle: -0.2,
-                          child: _OnboardingGlass(
+                          child: _OnboardingSurface(
                             width: width * 0.68,
                             height: height * 0.28,
                             borderRadius: 36,
@@ -103,7 +101,7 @@ class OnboardingScreen extends StatelessWidget {
                   SizedBox(
                     width: width * 0.54,
                     height: 48,
-                    child: _OnboardingGlass(
+                    child: _OnboardingSurface(
                       borderRadius: 26,
                       child: InkWell(
                         onTap: () {
@@ -135,8 +133,8 @@ class OnboardingScreen extends StatelessWidget {
   }
 }
 
-class _OnboardingGlass extends StatelessWidget {
-  const _OnboardingGlass({
+class _OnboardingSurface extends StatelessWidget {
+  const _OnboardingSurface({
     required this.child,
     required this.borderRadius,
     this.width,
@@ -150,31 +148,17 @@ class _OnboardingGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(borderRadius),
-            color: Colors.white.withValues(alpha: 0.12),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.22),
-            ),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withValues(alpha: 0.22),
-                Colors.white.withValues(alpha: 0.06),
-              ],
-            ),
-          ),
-          child: child,
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        color: Colors.white.withValues(alpha: 0.12),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.22),
         ),
       ),
+      child: child,
     );
   }
 }

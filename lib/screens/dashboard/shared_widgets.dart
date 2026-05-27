@@ -14,13 +14,13 @@ class _CircleIconButton extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
-      child: _LiquidGlass(
+      child: _AppSurface(
         width: 36,
         height: 36,
         borderRadius: 18,
         child: Icon(
           icon,
-          color: const Color(0xFF121212),
+          color: Theme.of(context).colorScheme.onSurface,
           size: 20,
         ),
       ),
@@ -28,8 +28,8 @@ class _CircleIconButton extends StatelessWidget {
   }
 }
 
-class _LiquidGlass extends StatelessWidget {
-  const _LiquidGlass({
+class _AppSurface extends StatelessWidget {
+  const _AppSurface({
     required this.child,
     this.width,
     this.height,
@@ -37,7 +37,7 @@ class _LiquidGlass extends StatelessWidget {
     this.padding,
     this.margin,
     this.borderRadius = 18,
-    this.opacity = 0.58,
+    this.opacity = 1,
   });
 
   final Widget child;
@@ -51,70 +51,49 @@ class _LiquidGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = Color.lerp(
+      colorScheme.surfaceContainerLow,
+      colorScheme.surface,
+      opacity.clamp(0, 1).toDouble(),
+    );
+
     return Container(
       width: width,
       height: height,
       constraints: constraints,
       margin: margin,
+      padding: padding,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2F2F3A) : const Color(0xFFEDEDF2),
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF34368C).withValues(alpha: 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            padding: padding,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(borderRadius),
-              color: Colors.white.withValues(alpha: opacity),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.62),
-              ),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.78),
-                  Colors.white.withValues(alpha: 0.34),
-                ],
-              ),
-            ),
-            child: child,
-          ),
-        ),
-      ),
+      child: child,
     );
   }
 }
 
-class _LiquidScaffoldBackground extends StatelessWidget {
-  const _LiquidScaffoldBackground({required this.child});
+class _AppScaffoldBackground extends StatelessWidget {
+  const _AppScaffoldBackground({required this.child});
 
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFFFFFFF),
-            Color(0xFFF4F8FF),
-            Color(0xFFF7F6FF),
-          ],
-        ),
-      ),
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerLowest,
       child: child,
     );
   }
@@ -123,7 +102,10 @@ class _LiquidScaffoldBackground extends StatelessWidget {
 void _showSearchSheet(BuildContext context) {
   Navigator.push(
     context,
-    MaterialPageRoute(builder: (_) => const _GlobalSearchPage()),
+    _adaptivePageRoute(
+      context,
+      builder: (_) => const _GlobalSearchPage(),
+    ),
   );
 }
 // modal for notifcation
@@ -177,7 +159,7 @@ void _showDemoSheet(
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.white,
+    backgroundColor: Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
@@ -193,6 +175,7 @@ void _showDemoSheet(
               Text(
                 title,
                 style: GoogleFonts.inter(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0,
@@ -202,7 +185,7 @@ void _showDemoSheet(
               Text(
                 message,
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF666666),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 13,
                   height: 1.35,
                   letterSpacing: 0,
@@ -272,29 +255,30 @@ class _GlobalSearchPageState extends State<_GlobalSearchPage> {
         : results.where((result) => result.matches(query)).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFF),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        centerTitle: true,
         elevation: 0,
-        foregroundColor: Colors.black,
-        titleSpacing: 0,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         title: Text(
           'Search',
+          textAlign: TextAlign.center,
           style: GoogleFonts.inter(
-            color: Colors.black,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 16,
             fontWeight: FontWeight.w700,
             letterSpacing: 0,
           ),
         ),
       ),
-      body: _LiquidScaffoldBackground(
+      body: _AppScaffoldBackground(
         child: SafeArea(
           top: false,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
             children: [
-              _LiquidGlass(
+              _AppSurface(
                 borderRadius: 18,
                 opacity: 0.72,
                 child: TextField(
@@ -353,7 +337,7 @@ class _SearchResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _LiquidGlass(
+    return _AppSurface(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       borderRadius: 18,

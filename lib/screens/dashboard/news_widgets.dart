@@ -41,6 +41,7 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
         ),
+
       ],
     );
   }
@@ -79,14 +80,12 @@ class _NewsCarousel extends StatelessWidget {
         ),
       ],
       options: CarouselOptions(
-
-        height: 140,
-        viewportFraction: 0.92,
-        enlargeCenterPage: true,
-        enlargeFactor: 0.16,
+        height: 228,
+        viewportFraction: 1,
+        enlargeCenterPage: false,
         enableInfiniteScroll: true,
         autoPlay: true,
-
+        autoPlayInterval: const Duration(seconds: 4),
         padEnds: false,
       ),
     );
@@ -122,13 +121,69 @@ class _CarouselImage extends StatelessWidget {
         author: author,
         date: date,
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Image.asset(
-          path,
-          width: double.infinity,
-          height: 140,
-          fit: BoxFit.cover,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.asset(
+                path,
+                width: double.infinity,
+                height: 132,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 11,
+                  backgroundImage: AssetImage(authorImagePath),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF666666),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  date,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF8A8A8A),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                color: Colors.black,
+                fontSize: 16,
+                height: 1.32,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -150,7 +205,6 @@ class _RecommendationList extends StatelessWidget {
           author: 'Chris Lloyd',
           date: 'Feb 23, 2025.',
         ),
-        SizedBox(height: 14),
         _RecommendationTile(
           imagePath: 'assets/images/pres.png',
           authorImagePath: 'assets/images/suit.png',
@@ -159,7 +213,6 @@ class _RecommendationList extends StatelessWidget {
           author: 'Issac Aheto',
           date: 'Feb 23, 2025.',
         ),
-        SizedBox(height: 14),
         _RecommendationTile(
           imagePath: 'assets/images/yellow.png',
           authorImagePath: 'assets/images/man.png',
@@ -168,7 +221,6 @@ class _RecommendationList extends StatelessWidget {
           author: 'Joseph Mensah',
           date: 'Feb 23, 2025.',
         ),
-        SizedBox(height: 14),
         _RecommendationTile(
           imagePath: 'assets/images/suit.png',
           authorImagePath: 'assets/images/white.png',
@@ -181,6 +233,53 @@ class _RecommendationList extends StatelessWidget {
     );
   }
 }
+
+class _RecommendationsPage extends StatelessWidget {
+  const _RecommendationsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _DemoPageShell(
+      title: 'Recommendations',
+      subtitle: 'Recommended stories and updates for members.',
+      children: [
+        _RecommendationTile(
+          imagePath: 'assets/images/man.png',
+          authorImagePath: 'assets/images/pres.png',
+          source: 'From NPP Youth Organizer',
+          title: 'Bawumiah is the man for the Job',
+          author: 'Chris Lloyd',
+          date: 'Feb 23, 2025.',
+        ),
+        _RecommendationTile(
+          imagePath: 'assets/images/pres.png',
+          authorImagePath: 'assets/images/suit.png',
+          source: 'From Tescon Central University',
+          title: 'Central University Tescon Honors Samira Bawumiah ...',
+          author: 'Issac Aheto',
+          date: 'Feb 23, 2025.',
+        ),
+        _RecommendationTile(
+          imagePath: 'assets/images/yellow.png',
+          authorImagePath: 'assets/images/man.png',
+          source: 'From Tescon Central University',
+          title: 'Central University Tescon Honors Samira Bawumiah ...',
+          author: 'Joseph Mensah',
+          date: 'Feb 23, 2025.',
+        ),
+        _RecommendationTile(
+          imagePath: 'assets/images/suit.png',
+          authorImagePath: 'assets/images/white.png',
+          source: 'From Tescon Central University',
+          title: 'Central University Tescon Honors Samira Bawumiah ...',
+          author: 'Kojo Folson',
+          date: 'Feb 23, 2025.',
+        ),
+      ],
+    );
+  }
+}
+
 
 class _RecommendationTile extends StatelessWidget {
   const _RecommendationTile({
@@ -212,67 +311,78 @@ class _RecommendationTile extends StatelessWidget {
         date: date,
       ),
       borderRadius: BorderRadius.circular(8),
-      child: _LiquidGlass(
+      child: _AppSurface(
         padding: const EdgeInsets.all(8),
         margin: const EdgeInsets.only(bottom: 2),
         borderRadius: 16,
         opacity: 0.62,
         child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(7),
-            child: Image.asset(
-              imagePath,
-              width: 116,
-              height: 84,
-              fit: BoxFit.cover,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: Image.asset(
+                imagePath,
+                width: 116,
+                height: 84,
+                fit: BoxFit.cover,
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: SizedBox(
-              height: 84,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    source,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFF7B7B7B),
-                      fontSize: 8,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      color: Colors.black,
-                      fontSize: 14,
-                      height: 1.08,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 9,
-                        backgroundImage: AssetImage(authorImagePath),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SizedBox(
+                height: 84,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      source,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF7B7B7B),
+                        fontSize: 8,
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: 0,
                       ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          author,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: Colors.black,
+                        fontSize: 14,
+                        height: 1.08,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 9,
+                          backgroundImage: AssetImage(authorImagePath),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            author,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF969696),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          date,
                           style: GoogleFonts.inter(
                             color: const Color(0xFF969696),
                             fontSize: 9,
@@ -280,25 +390,13 @@ class _RecommendationTile extends StatelessWidget {
                             letterSpacing: 0,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        date,
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFF969696),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0,
-                        ),
-                      ),
-
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );

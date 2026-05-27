@@ -14,7 +14,7 @@ class _DiscoverScreenState extends State<_DiscoverScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFF),
-      body: _LiquidScaffoldBackground(
+      body: _AppScaffoldBackground(
         child: SafeArea(
           bottom: false,
           child: ListView(
@@ -78,7 +78,7 @@ class _DiscoverSearchBar extends StatelessWidget {
     return InkWell(
       onTap: () => _showSearchSheet(context),
       borderRadius: BorderRadius.circular(22),
-      child: _LiquidGlass(
+      child: _AppSurface(
         height: 42,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         borderRadius: 22,
@@ -161,7 +161,7 @@ class _FilterChip extends StatelessWidget {
     return InkWell(
       onTap: onTap ?? () => _showSnack(context, '$label filter selected'),
       borderRadius: BorderRadius.circular(17),
-      child: _LiquidGlass(
+      child: _AppSurface(
         height: 30,
         padding: const EdgeInsets.symmetric(horizontal: 15),
         borderRadius: 17,

@@ -7,7 +7,7 @@ class _SavedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFF),
-      body: _LiquidScaffoldBackground(
+      body: _AppScaffoldBackground(
         child: SafeArea(
           bottom: false,
           child: ListView(
@@ -50,7 +50,7 @@ class _ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFF),
-      body: _LiquidScaffoldBackground(
+      body: _AppScaffoldBackground(
         child: SafeArea(
           bottom: false,
           child: ListView(
@@ -61,7 +61,7 @@ class _ProfileScreen extends StatelessWidget {
                 subtitle: 'Member account',
               ),
               const SizedBox(height: 24),
-              _LiquidGlass(
+              _AppSurface(
                 padding: const EdgeInsets.all(14),
                 borderRadius: 22,
                 opacity: 0.68,

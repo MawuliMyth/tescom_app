@@ -16,20 +16,10 @@ class _SiginScreenState extends State<SiginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFF),
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFFFFFFFF),
-                Color(0xFFF4F8FF),
-                Color(0xFFF7F6FF),
-              ],
-            ),
-          ),
+        child: ColoredBox(
+          color: Colors.white,
           child: LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
@@ -158,7 +148,7 @@ class _GoogleSignInButton extends StatelessWidget {
       child: FilledButton(
         onPressed: () {},
         style: FilledButton.styleFrom(
-          backgroundColor: Colors.white.withValues(alpha: 0.68),
+          backgroundColor: const Color(0xFFF6F6F6),
           foregroundColor: const Color(0xFF8D8D8D),
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -252,7 +242,7 @@ class _AuthInput extends StatelessWidget {
           size: 20,
         ),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.68),
+        fillColor: const Color(0xFFF6F6F6),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 16,

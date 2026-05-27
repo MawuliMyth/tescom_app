@@ -10,7 +10,8 @@ void _openNewsDetail(
   required String date,
 }) {
   Navigator.of(context).push(
-    MaterialPageRoute(
+    _adaptivePageRoute(
+      context,
       builder: (_) => _NewsDetailScreen(
         imagePath: imagePath,
         authorImagePath: authorImagePath,
@@ -47,192 +48,142 @@ class _NewsDetailScreen extends StatefulWidget {
 class _NewsDetailScreenState extends State<_NewsDetailScreen> {
   bool isSaved = false;
 
+  String get displaySource =>
+      widget.source.replaceFirst(RegExp(r'^From\s+', caseSensitive: false), '');
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFF),
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            expandedHeight: 410,
-            backgroundColor: Colors.black,
-            leading: _DetailCircleButton(
-              icon: Icons.chevron_left_rounded,
-              onTap: () => Navigator.pop(context),
-            ),
-            actions: [
-              _DetailCircleButton(
-                icon: isSaved
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_border_rounded,
-                onTap: () {
-                  setState(() => isSaved = !isSaved);
-                  _showSnack(
-                    context,
-                    isSaved ? 'Saved for later' : 'Removed from saved',
-                  );
-                },
-              ),
-              const SizedBox(width: 8),
-              _DetailCircleButton(
-                icon: Icons.more_horiz_rounded,
-                onTap: () => _showDemoSheet(
-                  context,
-                  title: 'More Actions',
-                  message: 'Share, report, and copy link.',
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 34),
+          children: [
+            Row(
+              children: [
+                _DetailCircleButton(
+                  icon: Icons.arrow_back_rounded,
+                  onTap: () => Navigator.pop(context),
                 ),
-              ),
-              const SizedBox(width: 10),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.asset(
-                    widget.imagePath,
-                    fit: BoxFit.cover,
-                    alignment: Alignment.topCenter,
-                  ),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0x66000000),
-                          Color(0x00000000),
-                          Color(0xD9000000),
-                        ],
-                        stops: [0, 0.45, 1],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 8,
-                    right: 8,
-                    bottom: 24,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF34368C),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            widget.source,
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          widget.title,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            color: Colors.white,
-                            fontSize: 22,
-                            height: 1.05,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Text(
-                              'Trending',
-                              style: GoogleFonts.inter(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.circle,
-                              size: 4,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              widget.date,
-                              style: GoogleFonts.inter(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                const Spacer(),
+                _DetailCircleButton(
+                  icon: isSaved
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                  onTap: () {
+                    setState(() => isSaved = !isSaved);
+                    _showSnack(
+                      context,
+                      isSaved ? 'Saved for later' : 'Removed from saved',
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 34),
+            Text(
+              widget.title,
+              style: GoogleFonts.inter(
+                color: const Color(0xFF151515),
+                fontSize: 22,
+                height: 1.36,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0,
               ),
             ),
-          ),
-          SliverToBoxAdapter(
-            child: Transform.translate(
-              offset: const Offset(0, -20),
-              child: _LiquidScaffoldBackground(
-                child: _LiquidGlass(
-                  margin: EdgeInsets.zero,
-                  padding: const EdgeInsets.fromLTRB(14, 30, 14, 30),
-                  borderRadius: 26,
-                  opacity: 0.78,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 14,
-                            backgroundImage: AssetImage(widget.authorImagePath),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            widget.author,
-                            style: GoogleFonts.inter(
-                              color: Colors.black,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      Text(
-                        _detailBody(),
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFF555555),
-                          fontSize: 11,
-                          height: 1.32,
-                          fontWeight: FontWeight.w400,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                    ],
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                CircleAvatar(
+                  radius: 13,
+                  backgroundImage: AssetImage(widget.authorImagePath),
+                ),
+                // const SizedBox(width: 5),
+                Text(
+                  displaySource,
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF666666),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0,
                   ),
+                ),
+                const SizedBox(width: 9),
+                const _DetailDot(),
+                const SizedBox(width: 9),
+                Text(
+                  widget.date,
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF666666),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(width: 9),
+                const _DetailDot(),
+                const SizedBox(width: 9),
+                Text(
+                  '8 Mins Read',
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF666666),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 34),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: Image.asset(
+                widget.imagePath,
+                width: double.infinity,
+                height: 254,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Center(
+              child: Text(
+                'Photo Courtesy By $displaySource',
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF777777),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 0,
                 ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 28),
+            Text(
+              _detailBody(),
+              style: GoogleFonts.inter(
+                color: const Color(0xFF1D1D1D),
+                fontSize: 15,
+                height: 1.58,
+                fontWeight: FontWeight.w400,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _DetailDot extends StatelessWidget {
+  const _DetailDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Icon(
+      Icons.circle,
+      size: 4,
+      color: Color(0xFF9A9A9A),
     );
   }
 }
@@ -248,21 +199,16 @@ class _DetailCircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(6),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: _LiquidGlass(
-          width: 34,
-          height: 34,
-          borderRadius: 17,
-          opacity: 0.34,
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: 20,
-          ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Icon(
+          icon,
+          color: const Color(0xFF111111),
+          size: 24,
         ),
       ),
     );

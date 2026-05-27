@@ -1,14 +1,17 @@
 part of '../dashboard_screen.dart';
 
 class _DashboardHome extends StatelessWidget {
-  const _DashboardHome();
+  const _DashboardHome({required this.onDrawerChanged});
+
+  final ValueChanged<bool> onDrawerChanged;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFF),
       drawer: const _DemoDrawer(),
-      body: _LiquidScaffoldBackground(
+      onDrawerChanged: onDrawerChanged,
+      body: _AppScaffoldBackground(
         child: SafeArea(
           bottom: false,
           child: ListView(
@@ -18,22 +21,28 @@ class _DashboardHome extends StatelessWidget {
               const SizedBox(height: 32),
               _SectionHeader(
                 title: 'Tescon News',
-                actionText: 'View all',
+                actionText: 'See all',
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const _LatestNewsPage()),
+                  _adaptivePageRoute(
+                    context,
+                    builder: (_) => const _LatestNewsPage(),
+                  ),
                 ),
+
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
+
               const _NewsCarousel(),
-              const SizedBox(height: 28),
               _SectionHeader(
                 title: 'Recommendation',
-                actionText: 'View All',
-                onTap: () => _showDemoSheet(
+                actionText: 'See all',
+                onTap: () => Navigator.push(
                   context,
-                  title: 'Recommendations',
-                  message: 'Showing all recommended posts.',
+                  _adaptivePageRoute(
+                    context,
+                    builder: (_) => const _RecommendationsPage(),
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
@@ -67,7 +76,10 @@ class _DashboardTopBar extends StatelessWidget {
           icon: Icons.notifications_none_rounded,
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const _NotificationsPage()),
+            _adaptivePageRoute(
+              context,
+              builder: (_) => const _NotificationsPage(),
+            ),
           ),
         ),
       ],
