@@ -2,7 +2,9 @@ part of '../dashboard_screen.dart';
 
 // Settings route with grouped preference/account sections.
 class _SettingsPage extends StatefulWidget {
-  const _SettingsPage();
+  const _SettingsPage({this.showBackButton = true});
+
+  final bool showBackButton;
 
   @override
   State<_SettingsPage> createState() => _SettingsPageState();
@@ -22,7 +24,10 @@ class _SettingsPageState extends State<_SettingsPage> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
             children: [
-              _SettingsHeader(onBack: () => Navigator.pop(context)),
+              _SettingsHeader(
+                showBackButton: widget.showBackButton,
+                onBack: () => Navigator.pop(context),
+              ),
               const SizedBox(height: 22),
               const _SettingsProfileHeader(),
               const SizedBox(height: 22),
@@ -104,15 +109,22 @@ class _SettingsPageState extends State<_SettingsPage> {
 
 // Top settings app bar with centered title.
 class _SettingsHeader extends StatelessWidget {
-  const _SettingsHeader({required this.onBack});
+  const _SettingsHeader({
+    required this.showBackButton,
+    required this.onBack,
+  });
 
+  final bool showBackButton;
   final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _PlainIconButton(icon: Icons.arrow_back_rounded, onTap: onBack),
+        if (showBackButton)
+          _PlainIconButton(icon: Icons.arrow_back_rounded, onTap: onBack)
+        else
+          const SizedBox(width: 40),
         Expanded(
           child: Text(
             'Settings',

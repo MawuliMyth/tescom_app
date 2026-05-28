@@ -60,7 +60,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         const _DiscoverScreen(),
         const _SavedScreen(),
-        const _ProfileScreen(),
+        const _SettingsPage(showBackButton: false),
       ],
       items: [
         _navItem(
@@ -79,9 +79,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           inactiveIcon: Icons.bookmark_border_rounded,
         ),
         _navItem(
-          title: 'Profile',
-          icon: Icons.person_rounded,
-          inactiveIcon: Icons.person_outline_rounded,
+          title: 'Settings',
+          icon: Icons.settings_rounded,
+          inactiveIcon: Icons.settings_outlined,
         ),
       ],
       isVisible: !_isDrawerOpen,

@@ -135,20 +135,6 @@ class _DemoDrawer extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const _DrawerDivider(),
-                    _DrawerSection(
-                      title: 'Account',
-                      children: [
-                        _DrawerTile(
-                          icon: Icons.settings_outlined,
-                          title: 'Settings',
-                          onTap: () => _openDrawerPage(
-                            context,
-                            const _SettingsPage(),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
