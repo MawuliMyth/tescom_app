@@ -8,11 +8,25 @@ class _LatestNewsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _DemoPageShell(
+    return _DemoPageShell(
       title: 'Latest News',
       subtitle: 'Official and campus TESCON stories.',
       children: [
-        _RecommendationList(),
+        FutureBuilder<AppBootstrap>(
+          future: AppRepository().loadBootstrap(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final articles = snapshot.data?.news ?? const [];
+            if (articles.isEmpty) return const _RecommendationList();
+
+            return Column(
+              children: articles.map(_ApiNewsTile.new).toList(),
+            );
+          },
+        ),
       ],
     );
   }

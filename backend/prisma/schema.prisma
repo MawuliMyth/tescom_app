@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SavedItemType {
+  NEWS
+  EVENT
+  JOB
+  ANNOUNCEMENT
+}
+
+model User {
+  id             String         @id @default(cuid())
+  email          String         @unique
+  passwordHash   String
+  fullName       String
+  phone          String?
+  institution    String?
+  avatarUrl      String?
+  bio            String?
+  role           UserRole       @default(USER)
+  status         UserStatus     @default(PENDING)
+  chapterId      String?
+  chapter        Chapter?       @relation(fields: [chapterId], references: [id])
+  pollVotes      PollVote[]
+  messages       Message[]
+  notifications  Notification[]
+  savedItems     SavedItem[]
+  refreshTokens  RefreshToken[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model Chapter {
+  id          String   @id @default(cuid())
+  name        String
+  campus      String
+  region      String?
+  description String?
+  logoUrl     String?
+  members     User[]
+  events      Event[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model NewsArticle {
+  id          String        @id @default(cuid())
+  title       String
+  summary     String
+  body        String
+  category    String?
+  imageUrl    String?
+  status      PublishStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Event {
+  id          String        @id @default(cuid())
+  title       String
+  description String
+  venue       String
+  startsAt    DateTime
+  endsAt      DateTime?
+  imageUrl    String?
+  status      PublishStatus @default(DRAFT)
+  chapterId   String?
+  chapter     Chapter?      @relation(fields: [chapterId], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Announcement {
+  id          String        @id @default(cuid())
+  title       String
+  body        String
+  priority    String        @default("normal")
+  status      PublishStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Job {
+  id          String        @id @default(cuid())
+  title       String
+  company     String
+  location    String
+  type        String
+  description String
+  applyUrl    String?
+  deadline    DateTime?
+  status      PublishStatus @default(DRAFT)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Poll {
+  id          String        @id @default(cuid())
+  question    String
+  description String?
+  status      PublishStatus @default(DRAFT)
+  closesAt    DateTime?
+  options     PollOption[]
+  votes       PollVote[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model PollOption {
+  id      String     @id @default(cuid())
+  text    String
+  pollId  String
+  poll    Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes   PollVote[]
+}
+
+model PollVote {
+  id        String     @id @default(cuid())
+  pollId    String
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  optionId  String
+  option    PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+
+  @@unique([pollId, userId])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  title     String
+  isGroup   Boolean   @default(true)
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  body           String
+  authorId       String
+  author         User         @relation(fields: [authorId], references: [id])
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+model SavedItem {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemType  SavedItemType
+  itemId    String
+  createdAt DateTime      @default(now())
+
+  @@unique([userId, itemType, itemId])
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  topic     String
+  message   String
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

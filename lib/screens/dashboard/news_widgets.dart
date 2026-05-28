@@ -234,6 +234,24 @@ class _RecommendationList extends StatelessWidget {
   }
 }
 
+class _ApiNewsTile extends StatelessWidget {
+  const _ApiNewsTile(this.article);
+
+  final AppNewsArticle article;
+
+  @override
+  Widget build(BuildContext context) {
+    return _RecommendationTile(
+      imagePath: article.imageUrl ?? 'assets/images/man.png',
+      authorImagePath: 'assets/images/logo.png',
+      source: article.category ?? 'TESCON',
+      title: article.title,
+      author: 'TESCON',
+      date: _friendlyDate(article.publishedAt ?? article.createdAt),
+    );
+  }
+}
+
 class _RecommendationsPage extends StatelessWidget {
   const _RecommendationsPage();
 
@@ -321,11 +339,10 @@ class _RecommendationTile extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(7),
-              child: Image.asset(
-                imagePath,
+              child: _DashboardContentImage(
+                path: imagePath,
                 width: 116,
                 height: 84,
-                fit: BoxFit.cover,
               ),
             ),
             const SizedBox(width: 10),
@@ -401,4 +418,54 @@ class _RecommendationTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DashboardContentImage extends StatelessWidget {
+  const _DashboardContentImage({
+    required this.path,
+    required this.width,
+    required this.height,
+  });
+
+  final String path;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    if (path.startsWith('http')) {
+      return Image.network(
+        path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _imageFallback(width, height),
+      );
+    }
+
+    return Image.asset(
+      path,
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+    );
+  }
+
+  Widget _imageFallback(double width, double height) {
+    return Container(
+      width: width,
+      height: height,
+      color: const Color(0xFFE7EAF6),
+      child: const Icon(Icons.image_not_supported_outlined),
+    );
+  }
+}
+
+String _friendlyDate(DateTime? value) {
+  if (value == null) return 'Recently';
+  final now = DateTime.now();
+  final difference = now.difference(value);
+  if (difference.inDays > 0) return '${difference.inDays}d ago';
+  if (difference.inHours > 0) return '${difference.inHours}h ago';
+  return 'Just now';
 }

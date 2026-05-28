@@ -106,72 +106,111 @@ class _JobsPageState extends State<_JobsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = jobs.where((job) {
-      final filterMatch = selectedFilter == 'All' || job.type == selectedFilter;
-      return filterMatch && job.matches(query);
-    }).toList();
+    return FutureBuilder<AppBootstrap>(
+      future: AppRepository().loadBootstrap(),
+      builder: (context, snapshot) {
+        final apiJobs = snapshot.data?.jobs.map(_jobFromApi).toList();
+        final sourceJobs = apiJobs == null || apiJobs.isEmpty ? jobs : apiJobs;
+        final filtered = sourceJobs.where((job) {
+          final filterMatch =
+              selectedFilter == 'All' || job.type == selectedFilter;
+          return filterMatch && job.matches(query);
+        }).toList();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFF),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        centerTitle: true,
-        elevation: 0,
-        foregroundColor: Colors.black,
-        title: Text(
-          'Jobs & Opportunities',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-          ),
-        ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
-          children: [
-            Text(
-              'Search internships, jobs, scholarships, national service, and youth development opportunities.',
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFF),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            centerTitle: true,
+            elevation: 0,
+            foregroundColor: Colors.black,
+            title: Text(
+              'Jobs & Opportunities',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
-                color: const Color(0xFF777777),
-                fontSize: 12,
-                height: 1.35,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 0,
               ),
             ),
-            const SizedBox(height: 16),
-            _DemoSearchField(
-              hintText: 'Search jobs or organizations',
-              onChanged: (value) => setState(() => query = value),
+          ),
+          body: SafeArea(
+            top: false,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
+              children: [
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const Center(child: CircularProgressIndicator()),
+                Text(
+                  'Search internships, jobs, scholarships, national service, and youth development opportunities.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF777777),
+                    fontSize: 12,
+                    height: 1.35,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _DemoSearchField(
+                  hintText: 'Search jobs or organizations',
+                  onChanged: (value) => setState(() => query = value),
+                ),
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: filters.map((filter) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: _FilterChip(
+                          label: filter,
+                          selected: selectedFilter == filter,
+                          onTap: () => setState(() => selectedFilter = filter),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (filtered.isEmpty)
+                  const _EmptyJobsState()
+                else
+                  ...filtered.map((job) => _JobCard(job: job)),
+              ],
             ),
-            const SizedBox(height: 12),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: filters.map((filter) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: _FilterChip(
-                      label: filter,
-                      selected: selectedFilter == filter,
-                      onTap: () => setState(() => selectedFilter = filter),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (filtered.isEmpty)
-              const _EmptyJobsState()
-            else
-              ...filtered.map((job) => _JobCard(job: job)),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
+    );
+  }
+
+  _Job _jobFromApi(AppJob job) {
+    final words = job.company
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .take(2)
+        .map((word) => word[0].toUpperCase())
+        .join();
+    return _Job(
+      title: job.title,
+      organization: job.company,
+      initials: words.isEmpty ? 'TS' : words,
+      location: job.location,
+      type: job.type,
+      salary: 'See details',
+      workMode: job.applyUrl == null ? 'TESCON' : 'Apply online',
+      experience: 'Member',
+      status: 'OPEN',
+      deadline: job.deadline == null
+          ? 'Open'
+          : '${job.deadline!.day}/${job.deadline!.month}/${job.deadline!.year}',
+      description: job.description,
+      requirements: const [
+        'Review the full opportunity details',
+        'Prepare the requested documents',
+        'Apply before the deadline where applicable',
+      ],
     );
   }
 }

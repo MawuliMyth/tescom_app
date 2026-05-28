@@ -80,60 +80,109 @@ class _EventsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFF),
-      body: _AppScaffoldBackground(
-        child: SafeArea(
-          bottom: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
-            children: [
-              Row(
+    return FutureBuilder<AppBootstrap>(
+      future: AppRepository().loadBootstrap(),
+      builder: (context, snapshot) {
+        final apiEvents = snapshot.data?.events.map(_eventFromApi).toList();
+        final currentEvents = apiEvents == null || apiEvents.isEmpty
+            ? _currentEvents
+            : apiEvents.take(2).toList();
+        final upcomingEvents = apiEvents == null || apiEvents.length <= 2
+            ? _upcomingEvents
+            : apiEvents.skip(2).toList();
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFF),
+          body: _AppScaffoldBackground(
+            child: SafeArea(
+              bottom: false,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
                 children: [
-                  _CircleIconButton(
-                    icon: Icons.arrow_back_rounded,
-                    onTap: () => Navigator.pop(context),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Events',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        color: const Color(0xFF111111),
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0,
+                  Row(
+                    children: [
+                      _CircleIconButton(
+                        icon: Icons.arrow_back_rounded,
+                        onTap: () => Navigator.pop(context),
                       ),
+                      Expanded(
+                        child: Text(
+                          'Events',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFF111111),
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 36),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const Center(child: CircularProgressIndicator()),
+                  const _EventSectionTitle('Current Events'),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    height: 252,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: currentEvents.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 14),
+                      itemBuilder: (context, index) {
+                        return _CurrentEventCard(event: currentEvents[index]);
+                      },
                     ),
                   ),
-                  const SizedBox(width: 36),
+                  const SizedBox(height: 26),
+                  const _EventSectionTitle('Upcoming Events'),
+                  const SizedBox(height: 14),
+                  ...upcomingEvents.map(
+                    (event) => _UpcomingEventCard(event: event),
+                  ),
                 ],
               ),
-              const SizedBox(height: 28),
-              const _EventSectionTitle('Current Events'),
-              const SizedBox(height: 14),
-              SizedBox(
-                height: 252,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _currentEvents.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 14),
-                  itemBuilder: (context, index) {
-                    return _CurrentEventCard(event: _currentEvents[index]);
-                  },
-                ),
-              ),
-              const SizedBox(height: 26),
-              const _EventSectionTitle('Upcoming Events'),
-              const SizedBox(height: 14),
-              ..._upcomingEvents.map(
-                (event) => _UpcomingEventCard(event: event),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  _EventItem _eventFromApi(AppEvent event) {
+    final minute = event.startsAt.minute.toString().padLeft(2, '0');
+    return _EventItem(
+      imagePath: event.imageUrl ?? 'assets/images/coursel_image.png',
+      title: event.title,
+      organizer: 'TESCON',
+      dateLabel: '${event.startsAt.hour}:$minute',
+      location: event.venue,
+      status: event.startsAt.isAfter(DateTime.now()) ? 'Upcoming' : 'Going On',
+      priceLabel: 'Free',
+      day: event.startsAt.day.toString().padLeft(2, '0'),
+      month: _monthLabel(event.startsAt.month),
+      details: event.description,
+    );
+  }
+
+  String _monthLabel(int month) {
+    const months = [
+      'JAN',
+      'FEB',
+      'MAR',
+      'APR',
+      'MAY',
+      'JUN',
+      'JUL',
+      'AUG',
+      'SEP',
+      'OCT',
+      'NOV',
+      'DEC',
+    ];
+    return months[month - 1];
   }
 }
 
@@ -626,12 +675,29 @@ class _EventImage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
-      child: Image.asset(
-        imagePath,
-        width: double.infinity,
-        height: height,
-        fit: BoxFit.cover,
-      ),
+      child: imagePath.startsWith('http')
+          ? Image.network(
+              imagePath,
+              width: double.infinity,
+              height: height,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => _eventImageFallback(height),
+            )
+          : Image.asset(
+              imagePath,
+              width: double.infinity,
+              height: height,
+              fit: BoxFit.cover,
+            ),
+    );
+  }
+
+  Widget _eventImageFallback(double height) {
+    return Container(
+      width: double.infinity,
+      height: height,
+      color: const Color(0xFFE7EAF6),
+      child: const Icon(Icons.event_busy_outlined),
     );
   }
 }

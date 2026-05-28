@@ -3,6 +3,8 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
+import 'package:tescon_app/core/app_models.dart';
+import 'package:tescon_app/core/app_repository.dart';
 
 part 'dashboard/home_tab.dart';
 part 'dashboard/drawer.dart';
