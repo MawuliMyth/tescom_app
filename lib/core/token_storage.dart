@@ -4,7 +4,11 @@ import 'auth_tokens.dart';
 
 class TokenStorage {
   TokenStorage({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage();
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            aOptions: AndroidOptions(encryptedSharedPreferences: true),
+          );
 
   static const _accessTokenKey = 'access_token';
   static const _refreshTokenKey = 'refresh_token';
@@ -43,6 +47,14 @@ class TokenStorage {
     return refreshToken != null &&
         expiresAt != null &&
         expiresAt.isAfter(DateTime.now());
+  }
+
+  Future<bool> hasValidAccessSession() async {
+    final accessToken = await readAccessToken();
+    final expiresAt = await _readDate(_accessTokenExpiresAtKey);
+    return accessToken != null &&
+        expiresAt != null &&
+        expiresAt.isAfter(DateTime.now().add(const Duration(minutes: 1)));
   }
 
   Future<bool> shouldRefreshAccessToken() async {

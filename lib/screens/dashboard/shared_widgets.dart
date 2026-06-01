@@ -1,10 +1,7 @@
 part of '../dashboard_screen.dart';
 
 class _CircleIconButton extends StatelessWidget {
-  const _CircleIconButton({
-    required this.icon,
-    required this.onTap,
-  });
+  const _CircleIconButton({required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback onTap;
@@ -102,12 +99,10 @@ class _AppScaffoldBackground extends StatelessWidget {
 void _showSearchSheet(BuildContext context) {
   Navigator.push(
     context,
-    _adaptivePageRoute(
-      context,
-      builder: (_) => const _GlobalSearchPage(),
-    ),
+    _adaptivePageRoute(context, builder: (_) => const _GlobalSearchPage()),
   );
 }
+
 // modal for notifcation
 // void _showDemoSheet(
 //   BuildContext context, {
@@ -152,10 +147,10 @@ void _showSearchSheet(BuildContext context) {
 //   );
 // }
 void _showDemoSheet(
-    BuildContext context, {
-      required String title,
-      required String message,
-    }) {
+  BuildContext context, {
+  required String title,
+  required String message,
+}) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -203,11 +198,75 @@ void _showSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+}
+
+class _ShimmerBlock extends StatelessWidget {
+  const _ShimmerBlock({
+    required this.height,
+    this.width,
+    this.borderRadius = 16,
+    this.margin = EdgeInsets.zero,
+  });
+
+  final double height;
+  final double? width;
+  final double borderRadius;
+  final EdgeInsetsGeometry margin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: const Color(0xFFE8ECF4),
+      highlightColor: const Color(0xFFF8FAFF),
+      child: Container(
+        width: width ?? double.infinity,
+        height: height,
+        margin: margin,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
       ),
     );
+  }
+}
+
+class _ListShimmer extends StatelessWidget {
+  const _ListShimmer({this.itemCount = 3});
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(
+        itemCount,
+        (index) => const _ShimmerBlock(
+          height: 92,
+          borderRadius: 18,
+          margin: EdgeInsets.only(bottom: 12),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineErrorState extends StatelessWidget {
+  const _InlineErrorState();
+
+  @override
+  Widget build(BuildContext context) {
+    return _InfoCard(
+      item: _InfoItem(
+        title: 'Something went wrong',
+        subtitle: 'Connection error',
+        body: 'We could not load this data. Please try again.',
+        icon: Icons.error_outline_rounded,
+      ),
+    );
+  }
 }
 
 class _GlobalSearchPage extends StatefulWidget {
@@ -220,40 +279,8 @@ class _GlobalSearchPage extends StatefulWidget {
 class _GlobalSearchPageState extends State<_GlobalSearchPage> {
   String query = '';
 
-  final results = const [
-    _SearchResult(
-      title: 'National Delegates Conference 2025 is happening Tomorrow',
-      label: 'News',
-      icon: Icons.article_outlined,
-    ),
-    _SearchResult(
-      title: 'Origins of TESCON',
-      label: 'History',
-      icon: Icons.history_edu_outlined,
-    ),
-    _SearchResult(
-      title: 'Chris Lloyd Nii Kwesi',
-      label: 'Member biography',
-      icon: Icons.badge_outlined,
-    ),
-    _SearchResult(
-      title: 'Communications Intern',
-      label: 'Job opportunity',
-      icon: Icons.work_outline_rounded,
-    ),
-    _SearchResult(
-      title: 'National Campus Tour',
-      label: 'Event',
-      icon: Icons.event_outlined,
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
-    final filtered = query.trim().isEmpty
-        ? results
-        : results.where((result) => result.matches(query)).toList();
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -293,17 +320,71 @@ class _GlobalSearchPageState extends State<_GlobalSearchPage> {
                 ),
               ),
               const SizedBox(height: 18),
-              ...filtered.map((result) => _SearchResultTile(result: result)),
-              if (filtered.isEmpty)
-                const _InfoCard(
-                  item: _InfoItem(
-                    title: 'No results found',
-                    subtitle: 'Try a different keyword',
-                    body:
-                        'Search across news, history, members, jobs, and events.',
-                    icon: Icons.search_off_rounded,
-                  ),
-                ),
+              FutureBuilder<List<Object>>(
+                future: Future.wait([
+                  AppRepository().loadBootstrap(),
+                  AppRepository().loadMembers(),
+                ]),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const _ListShimmer(itemCount: 4);
+                  }
+                  if (snapshot.hasError) return const _InlineErrorState();
+
+                  final bootstrap = snapshot.data?[0] as AppBootstrap?;
+                  final members =
+                      snapshot.data?[1] as List<AppUser>? ?? const [];
+                  final results = [
+                    for (final item in bootstrap?.news ?? const [])
+                      _SearchResult(
+                        title: item.title,
+                        label: 'News',
+                        icon: Icons.article_outlined,
+                      ),
+                    for (final item in bootstrap?.events ?? const [])
+                      _SearchResult(
+                        title: item.title,
+                        label: 'Event',
+                        icon: Icons.event_outlined,
+                      ),
+                    for (final item in bootstrap?.jobs ?? const [])
+                      _SearchResult(
+                        title: item.title,
+                        label: 'Job opportunity',
+                        icon: Icons.work_outline_rounded,
+                      ),
+                    for (final item in members)
+                      _SearchResult(
+                        title: item.fullName,
+                        label: item.organizationRole ?? 'Member biography',
+                        icon: Icons.badge_outlined,
+                      ),
+                  ];
+                  final filtered = query.trim().isEmpty
+                      ? results
+                      : results
+                            .where((result) => result.matches(query))
+                            .toList();
+
+                  if (filtered.isEmpty) {
+                    return const _InfoCard(
+                      item: _InfoItem(
+                        title: 'No results found',
+                        subtitle: 'Live search',
+                        body:
+                            'Published news, events, jobs, and members will appear here.',
+                        icon: Icons.search_off_rounded,
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: filtered
+                        .map((result) => _SearchResultTile(result: result))
+                        .toList(),
+                  );
+                },
+              ),
             ],
           ),
         ),

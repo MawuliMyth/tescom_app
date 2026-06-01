@@ -8,11 +8,35 @@ class _Member {
     required this.institution,
     required this.imagePath,
     required this.bio,
+    this.id,
     this.joinDate = '1/09/2024',
     this.memberCount = '15',
     this.contribution = 'Campus Mobilization',
+    this.chapterId,
   });
 
+  factory _Member.fromUser(AppUser user) {
+    final joined = user.createdAt == null
+        ? 'Joined'
+        : 'Joined ${user.createdAt!.year}';
+    return _Member(
+      id: user.id,
+      name: user.fullName,
+      role: user.organizationRole ?? 'TESCON Member',
+      institution: user.institution ?? 'TESCON',
+      imagePath: user.avatarUrl ?? 'assets/images/logo.png',
+      bio: user.bio == null || user.bio!.trim().isEmpty
+          ? 'No biography has been added for this member yet.'
+          : user.bio!,
+      joinDate: joined,
+      memberCount: user.organizationRole == null ? 'Member' : 'Executive',
+      contribution: user.organizationRole ?? 'Membership',
+      chapterId: user.chapterId,
+    );
+  }
+
+  final String? id;
+  final String? chapterId;
   final String name;
   final String role;
   final String institution;
@@ -31,68 +55,6 @@ class _Member {
         bio.toLowerCase().contains(lower) ||
         memberCount.toLowerCase().contains(lower) ||
         contribution.toLowerCase().contains(lower);
-  }
-}
-
-// Member row used by the new directory screen.
-class _DirectoryMemberRow extends StatelessWidget {
-  const _DirectoryMemberRow({required this.member});
-
-  final _Member member;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => _showMemberDetailSheet(context, member),
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 23,
-              backgroundImage: AssetImage(member.imagePath),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    member.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFF222222),
-                      fontSize: 17,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    member.role,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFF777777),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFF222222),
-              size: 28,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
@@ -116,7 +78,7 @@ class _MemberCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 28,
-              backgroundImage: AssetImage(member.imagePath),
+              backgroundImage: _memberImageProvider(member.imagePath),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -162,12 +124,16 @@ class _MemberCard extends StatelessWidget {
   }
 }
 
+ImageProvider _memberImageProvider(String path) {
+  if (path.startsWith('http') || path.startsWith('/')) {
+    return CachedNetworkImageProvider(ApiConfig.mediaUrl(path));
+  }
+  return AssetImage(path);
+}
+
 // Plain icon touch target used by the membership directory header.
 class _PlainIconButton extends StatelessWidget {
-  const _PlainIconButton({
-    required this.icon,
-    required this.onTap,
-  });
+  const _PlainIconButton({required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback onTap;

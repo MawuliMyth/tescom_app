@@ -86,7 +86,7 @@ class _MemberProfileHeader extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 50,
-          backgroundImage: AssetImage(member.imagePath),
+          backgroundImage: _memberImageProvider(member.imagePath),
         ),
         const SizedBox(height: 18),
         Text(
@@ -120,11 +120,11 @@ class _MemberProfileHeader extends StatelessWidget {
               icon: Icons.calendar_today_outlined,
               text: member.joinDate,
             ),
-            _MemberStat(icon: Icons.groups_2_outlined, text: member.memberCount),
             _MemberStat(
-              icon: Icons.flag_outlined,
-              text: member.contribution,
+              icon: Icons.groups_2_outlined,
+              text: member.memberCount,
             ),
+            _MemberStat(icon: Icons.flag_outlined, text: member.contribution),
           ],
         ),
       ],
@@ -162,11 +162,7 @@ class _MemberBioCard extends StatelessWidget {
               ),
             ),
           ),
-          const Icon(
-            Icons.badge_outlined,
-            color: Color(0xFF34368C),
-            size: 32,
-          ),
+          const Icon(Icons.badge_outlined, color: Color(0xFF34368C), size: 32),
         ],
       ),
     );
@@ -185,10 +181,7 @@ class _MemberDetailRows extends StatelessWidget {
       children: [
         _MemberDetailRow(label: 'Role', value: member.role),
         _MemberDetailRow(label: 'Institution', value: member.institution),
-        _MemberDetailRow(
-          label: 'Membership',
-          value: member.memberCount,
-        ),
+        _MemberDetailRow(label: 'Membership', value: member.memberCount),
         _MemberDetailRow(
           label: 'Focus area',
           value: member.contribution,
@@ -246,10 +239,7 @@ class _MemberDetailRow extends StatelessWidget {
 
 // Compact icon + text stat used under the member name.
 class _MemberStat extends StatelessWidget {
-  const _MemberStat({
-    required this.icon,
-    required this.text,
-  });
+  const _MemberStat({required this.icon, required this.text});
 
   final IconData icon;
   final String text;

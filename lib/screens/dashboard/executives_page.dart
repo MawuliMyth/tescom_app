@@ -18,8 +18,6 @@ class _ExecutivesPageState extends State<_ExecutivesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredExecutives = _filterExecutives(_executives);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFF),
       appBar: AppBar(
@@ -43,65 +41,96 @@ class _ExecutivesPageState extends State<_ExecutivesPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
           children: [
-            Text(
-              'Leadership Team',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                color: Colors.black,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0,
-              ),
+            FutureBuilder<List<AppUser>>(
+              future: AppRepository().loadExecutives(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 34),
+                    child: _ListShimmer(itemCount: 4),
+                  );
+                }
+                if (snapshot.hasError) return const _InlineErrorState();
+
+                final executives = (snapshot.data ?? const [])
+                    .map(_Member.fromUser)
+                    .toList();
+                final filteredExecutives = _filterExecutives(executives);
+                final schools = [
+                  'All',
+                  ...{for (final member in executives) member.institution},
+                ];
+                final roles = [
+                  'All',
+                  ...{for (final member in executives) member.role},
+                ];
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Leadership Team',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        color: Colors.black,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Meet the leaders driving the organization forward.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF777777),
+                        fontSize: 13,
+                        height: 1.35,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _MemberSearchField(
+                            hintText: 'Search by name',
+                            onChanged: (value) => setState(() => query = value),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        _SmartMemberFilterButton(
+                          selectedSchool: selectedSchool,
+                          selectedRole: selectedRole,
+                          schools: schools,
+                          roles: roles,
+                          onApply: (school, role) {
+                            setState(() {
+                              selectedSchool = school;
+                              selectedRole = role;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    if (selectedSchool != 'All' || selectedRole != 'All') ...[
+                      const SizedBox(height: 10),
+                      _ActiveFilterSummary(
+                        selectedSchool: selectedSchool,
+                        selectedRole: selectedRole,
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    if (filteredExecutives.isEmpty)
+                      const _EmptyMemberState()
+                    else
+                      ...filteredExecutives.map(
+                        (member) => _MemberCard(member: member),
+                      ),
+                  ],
+                );
+              },
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Meet the leaders driving the organization forward.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                color: const Color(0xFF777777),
-                fontSize: 13,
-                height: 1.35,
-                letterSpacing: 0,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: _MemberSearchField(
-                    hintText: 'Search by name',
-                    onChanged: (value) => setState(() => query = value),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                _SmartMemberFilterButton(
-                  selectedSchool: selectedSchool,
-                  selectedRole: selectedRole,
-                  schools: _executiveSchools,
-                  roles: _executiveRoles,
-                  onApply: (school, role) {
-                    setState(() {
-                      selectedSchool = school;
-                      selectedRole = role;
-                    });
-                  },
-                ),
-              ],
-            ),
-            if (selectedSchool != 'All' || selectedRole != 'All') ...[
-              const SizedBox(height: 10),
-              _ActiveFilterSummary(
-                selectedSchool: selectedSchool,
-                selectedRole: selectedRole,
-              ),
-            ],
-            const SizedBox(height: 18),
-            if (filteredExecutives.isEmpty)
-              const _EmptyMemberState()
-            else
-              ...filteredExecutives.map(
-                (member) => _MemberCard(member: member),
-              ),
           ],
         ),
       ),
@@ -119,47 +148,3 @@ class _ExecutivesPageState extends State<_ExecutivesPage> {
     }).toList();
   }
 }
-
-// Static executive data for the leadership screen.
-const _executives = [
-  _Member(
-    name: 'Chris Lloyd Nii Kwesi',
-    role: 'Youth Organizer',
-    institution: 'National TESCON',
-    imagePath: 'assets/images/suit.png',
-    memberCount: 'Executive',
-    contribution: 'Campus Mobilization',
-    bio:
-        'Coordinates youth communication, chapter mobilization, and student engagement programs.',
-  ),
-  _Member(
-    name: 'Ama Serwaa Mensah',
-    role: 'Chapter President',
-    institution: 'University of Ghana',
-    imagePath: 'assets/images/white.png',
-    memberCount: 'Executive',
-    contribution: 'Chapter Leadership',
-    bio:
-        'Leads campus chapter planning, event execution, and membership growth.',
-  ),
-  _Member(
-    name: 'Kojo Ali',
-    role: 'Communications Lead',
-    institution: 'Central University',
-    imagePath: 'assets/images/man.png',
-    memberCount: 'Executive',
-    contribution: 'Media & Publicity',
-    bio:
-        'Coordinates chapter announcements, event media, and digital storytelling.',
-  ),
-];
-
-// Filter options are generated from the executive data.
-final _executiveSchools = [
-  'All',
-  ...{for (final member in _executives) member.institution},
-];
-final _executiveRoles = [
-  'All',
-  ...{for (final member in _executives) member.role},
-];

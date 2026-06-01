@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:tescon_app/core/auth_service.dart';
 import 'package:tescon_app/screens/dashboard_screen.dart';
@@ -14,6 +15,7 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final _authService = AuthService();
+  final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
@@ -43,10 +45,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Future<void> _signUp() async {
-    if (_passwordController.text != _confirmPasswordController.text) {
-      setState(() => _errorMessage = 'Passwords do not match');
-      return;
-    }
+    FocusScope.of(context).unfocus();
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() {
       _isSubmitting = true;
@@ -88,99 +88,116 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 padding: EdgeInsets.symmetric(horizontal: width * 0.065),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: Column(
-                    children: [
-                      SizedBox(height: constraints.maxHeight * 0.13),
-                      Image.asset(
-                        'assets/images/logo.png',
-                        height: 72,
-                        fit: BoxFit.contain,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Create A New Account',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFF111111),
-                          fontSize: 20,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0,
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        SizedBox(height: constraints.maxHeight * 0.13),
+                        Image.asset(
+                          'assets/images/logo.png',
+                          height: 72,
+                          fit: BoxFit.contain,
                         ),
-                      ),
-                      const SizedBox(height: 18),
-                      _SignUpInput(
-                        controller: _fullNameController,
-                        hintText: 'Full Name',
-                      ),
-                      const SizedBox(height: 16),
-                      _PhoneInput(controller: _phoneController),
-                      const SizedBox(height: 16),
-                      _InstitutionDropdown(
-                        value: selectedInstitution,
-                        institutions: institutions,
-                        onChanged: (value) {
-                          setState(() => selectedInstitution = value);
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      _SignUpInput(
-                        controller: _emailController,
-                        hintText: 'Enter Email',
-                        icon: Icons.mail_outline,
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 16),
-                      _SignUpInput(
-                        controller: _passwordController,
-                        hintText: 'Enter Password',
-                        icon: Icons.key_outlined,
-                        obscureText: true,
-                      ),
-                      const SizedBox(height: 16),
-                      _SignUpInput(
-                        controller: _confirmPasswordController,
-                        hintText: 'Confirm New Password',
-                        icon: Icons.key_outlined,
-                        obscureText: true,
-                      ),
-                      if (_errorMessage != null) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         Text(
-                          _errorMessage!,
+                          'Create A New Account',
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(
-                            color: Colors.red.shade700,
-                            fontSize: 12,
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFF111111),
+                            fontSize: 20,
                             fontWeight: FontWeight.w500,
                             letterSpacing: 0,
                           ),
                         ),
-                      ],
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: FilledButton(
-                          onPressed: _isSubmitting ? null : _signUp,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF34368C),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
+                        const SizedBox(height: 18),
+                        _SignUpInput(
+                          controller: _fullNameController,
+                          hintText: 'Full Name',
+                          textInputAction: TextInputAction.next,
+                          validator: _validateFullName,
+                        ),
+                        const SizedBox(height: 16),
+                        _PhoneInput(controller: _phoneController),
+                        const SizedBox(height: 16),
+                        _InstitutionDropdown(
+                          value: selectedInstitution,
+                          institutions: institutions,
+                          validator: _validateInstitution,
+                          onChanged: (value) {
+                            setState(() => selectedInstitution = value);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _SignUpInput(
+                          controller: _emailController,
+                          hintText: 'Enter Email',
+                          icon: Icons.mail_outline,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          validator: _validateEmail,
+                        ),
+                        const SizedBox(height: 16),
+                        _SignUpInput(
+                          controller: _passwordController,
+                          hintText: 'Enter Password',
+                          icon: Icons.key_outlined,
+                          obscureText: true,
+                          textInputAction: TextInputAction.next,
+                          validator: _validatePassword,
+                        ),
+                        const SizedBox(height: 16),
+                        _SignUpInput(
+                          controller: _confirmPasswordController,
+                          hintText: 'Confirm New Password',
+                          icon: Icons.key_outlined,
+                          obscureText: true,
+                          textInputAction: TextInputAction.done,
+                          validator: (value) => _validateConfirmPassword(
+                            value,
+                            _passwordController.text,
                           ),
-                          child: Text(
-                            _isSubmitting ? 'Signing Up...' : 'Sign Up',
+                          onFieldSubmitted: (_) =>
+                              _isSubmitting ? null : _signUp(),
+                        ),
+                        if (_errorMessage != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            _errorMessage!,
+                            textAlign: TextAlign.center,
                             style: GoogleFonts.poppins(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                              color: Colors.red.shade700,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
                               letterSpacing: 0,
                             ),
                           ),
+                        ],
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: FilledButton(
+                            onPressed: _isSubmitting ? null : _signUp,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF34368C),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            child: Text(
+                              _isSubmitting ? 'Signing Up...' : 'Sign Up',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                    ],
+                        const SizedBox(height: 32),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -192,6 +209,64 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 }
 
+final RegExp _emailPattern = RegExp(
+  r'^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$',
+  caseSensitive: false,
+);
+final RegExp _namePattern = RegExp(r"^[A-Za-z][A-Za-z' -]{1,}$");
+final RegExp _ghanaPhonePattern = RegExp(
+  r'^(?:0|233)(?:20|23|24|25|26|27|28|29|50|53|54|55|56|57|59)[0-9]{7}$',
+);
+
+String? _validateFullName(String? value) {
+  final name = value?.trim() ?? '';
+  if (name.isEmpty) return 'Full name is required';
+  if (name.length < 2) return 'Enter your full name';
+  if (!_namePattern.hasMatch(name)) {
+    return 'Use letters, spaces, hyphens, or apostrophes only';
+  }
+  return null;
+}
+
+String? _validatePhone(String? value) {
+  final phone = (value ?? '').replaceAll(RegExp(r'\s+'), '');
+  if (phone.isEmpty) return 'Phone number is required';
+  if (!_ghanaPhonePattern.hasMatch(phone)) {
+    return 'Enter a valid Ghana phone number';
+  }
+  return null;
+}
+
+String? _validateInstitution(String? value) {
+  if (value == null || value.trim().isEmpty) return 'Choose your institution';
+  return null;
+}
+
+String? _validateEmail(String? value) {
+  final email = value?.trim() ?? '';
+  if (email.isEmpty) return 'Email is required';
+  if (!_emailPattern.hasMatch(email)) return 'Enter a valid email address';
+  return null;
+}
+
+String? _validatePassword(String? value) {
+  final password = value ?? '';
+  if (password.isEmpty) return 'Password is required';
+  if (password.length < 8) return 'Password must be at least 8 characters';
+  if (!RegExp(r'[A-Za-z]').hasMatch(password) ||
+      !RegExp(r'\d').hasMatch(password)) {
+    return 'Use at least one letter and one number';
+  }
+  return null;
+}
+
+String? _validateConfirmPassword(String? value, String password) {
+  final confirmPassword = value ?? '';
+  if (confirmPassword.isEmpty) return 'Confirm your password';
+  if (confirmPassword != password) return 'Passwords do not match';
+  return null;
+}
+
 class _SignUpInput extends StatelessWidget {
   const _SignUpInput({
     required this.controller,
@@ -199,6 +274,9 @@ class _SignUpInput extends StatelessWidget {
     this.icon,
     this.keyboardType,
     this.obscureText = false,
+    this.textInputAction,
+    this.validator,
+    this.onFieldSubmitted,
   });
 
   final TextEditingController controller;
@@ -206,13 +284,20 @@ class _SignUpInput extends StatelessWidget {
   final IconData? icon;
   final TextInputType? keyboardType;
   final bool obscureText;
+  final TextInputAction? textInputAction;
+  final FormFieldValidator<String>? validator;
+  final ValueChanged<String>? onFieldSubmitted;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
+      textInputAction: textInputAction,
+      validator: validator,
+      onFieldSubmitted: onFieldSubmitted,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       style: GoogleFonts.poppins(
         color: const Color(0xFF222222),
         fontSize: 14,
@@ -239,6 +324,12 @@ class _SignUpInput extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
+        errorStyle: GoogleFonts.poppins(
+          color: Colors.red.shade700,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0,
+        ),
       ),
     );
   }
@@ -251,9 +342,16 @@ class _PhoneInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: controller,
       keyboardType: TextInputType.phone,
+      textInputAction: TextInputAction.next,
+      validator: _validatePhone,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(12),
+      ],
       style: GoogleFonts.poppins(
         color: const Color(0xFF222222),
         fontSize: 14,
@@ -293,6 +391,12 @@ class _PhoneInput extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
+        errorStyle: GoogleFonts.poppins(
+          color: Colors.red.shade700,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0,
+        ),
       ),
     );
   }
@@ -303,11 +407,13 @@ class _InstitutionDropdown extends StatelessWidget {
     required this.value,
     required this.institutions,
     required this.onChanged,
+    this.validator,
   });
 
   final String? value;
   final List<String> institutions;
   final ValueChanged<String?> onChanged;
+  final FormFieldValidator<String>? validator;
 
   @override
   Widget build(BuildContext context) {
@@ -317,6 +423,8 @@ class _InstitutionDropdown extends StatelessWidget {
         return DropdownMenuItem(value: institution, child: Text(institution));
       }).toList(),
       onChanged: onChanged,
+      validator: validator,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       icon: const Icon(
         Icons.keyboard_arrow_down_rounded,
         color: Color(0xFF7C7C7C),
@@ -343,6 +451,12 @@ class _InstitutionDropdown extends StatelessWidget {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
+        ),
+        errorStyle: GoogleFonts.poppins(
+          color: Colors.red.shade700,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0,
         ),
       ),
     );

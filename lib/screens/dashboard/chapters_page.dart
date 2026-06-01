@@ -41,13 +41,117 @@ class _ChaptersPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            ..._campusChapters.map(
-              (chapter) => _CampusChapterTile(chapter: chapter),
+            FutureBuilder<List<Object>>(
+              future: Future.wait<Object>([
+                AppRepository().loadBootstrap(),
+                AppRepository().loadMembers(),
+              ]),
+              builder: (context, snapshot) {
+                final bootstrap = snapshot.data == null
+                    ? null
+                    : snapshot.data![0] as AppBootstrap;
+                final members = snapshot.data == null
+                    ? const <AppUser>[]
+                    : snapshot.data![1] as List<AppUser>;
+                final apiChapters = bootstrap?.chapters
+                    .map(
+                      (chapter) =>
+                          _chapterFromApi(chapter, members, bootstrap.events),
+                    )
+                    .toList(growable: false);
+                final chapters = apiChapters ?? const [];
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const _ListShimmer(itemCount: 4);
+                }
+                if (snapshot.hasError) return const _InlineErrorState();
+
+                if (chapters.isEmpty) {
+                  return const _InfoCard(
+                    item: _InfoItem(
+                      title: 'No chapters yet',
+                      subtitle: 'Admin dashboard',
+                      body: 'Created chapters will appear here.',
+                      icon: Icons.school_outlined,
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: chapters
+                      .map((chapter) => _CampusChapterTile(chapter: chapter))
+                      .toList(),
+                );
+              },
             ),
           ],
         ),
       ),
     );
+  }
+
+  _CampusChapter _chapterFromApi(
+    AppChapter chapter,
+    List<AppUser> users,
+    List<AppEvent> events,
+  ) {
+    final name = chapter.name.isEmpty ? chapter.campus : chapter.name;
+    final chapterMembers = users
+        .where((user) => user.chapterId == chapter.id)
+        .map(_Member.fromUser)
+        .toList(growable: false);
+    final chapterExecutives = chapterMembers
+        .where((member) => member.contribution != 'Membership')
+        .toList(growable: false);
+    final chapterEvents = events
+        .where((event) => event.chapterId == chapter.id)
+        .map(
+          (event) => _ChapterEvent(
+            title: event.title,
+            date: _formatChapterEventDate(event.startsAt, event.endsAt),
+            location: event.venue,
+          ),
+        )
+        .toList(growable: false);
+    return _CampusChapter(
+      name: name,
+      shortName: name,
+      location: [
+        chapter.campus,
+        if (chapter.region != null && chapter.region!.isNotEmpty)
+          chapter.region!,
+      ].join(', '),
+      logoPath: chapter.logoUrl ?? 'assets/images/logo.png',
+      membersCount: chapterMembers.isEmpty
+          ? chapter.membersCount
+          : chapterMembers.length,
+      executivesCount: chapterExecutives.isEmpty
+          ? chapter.executivesCount
+          : chapterExecutives.length,
+      eventsCount: chapterEvents.isEmpty ? chapter.eventsCount : chapterEvents.length,
+      newsCount: 0,
+      description:
+          chapter.description ??
+          'No chapter description has been added yet.',
+      executives: chapterExecutives,
+      members: chapterMembers,
+      news: const [],
+      events: chapterEvents,
+    );
+  }
+
+  String _formatChapterEventDate(DateTime startsAt, DateTime? endsAt) {
+    final start = '${startsAt.day}/${startsAt.month}/${startsAt.year}';
+    if (endsAt == null) return start;
+    final end = '${endsAt.day}/${endsAt.month}/${endsAt.year}';
+    return start == end ? '$start, ${_formatTime(startsAt)} - ${_formatTime(endsAt)}' : '$start - $end';
+  }
+
+  String _formatTime(DateTime value) {
+    final period = value.hour >= 12 ? 'PM' : 'AM';
+    final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute $period';
   }
 }
 
@@ -109,544 +213,6 @@ class _ChapterEvent {
   final String date;
   final String location;
 }
-
-// Demo chapter records using the university logos already in assets/images.
-const _campusChapters = [
-  _CampusChapter(
-    name: 'University of Ghana',
-    shortName: 'UG TESCON',
-    location: 'Legon, Accra',
-    logoPath: 'assets/images/268456827778626902.jpg',
-    membersCount: 1320,
-    executivesCount: 12,
-    eventsCount: 8,
-    newsCount: 17,
-    description:
-        'University of Ghana TESCON coordinates student outreach, leadership programs, campus news, and chapter activities across Legon.',
-    executives: [
-      _Member(
-        name: 'Ama Serwaa Mensah',
-        role: 'Chapter President',
-        institution: 'University of Ghana',
-        imagePath: 'assets/images/white.png',
-        memberCount: 'Executive',
-        contribution: 'Chapter Leadership',
-        bio: 'Leads chapter programs, membership drives, and campus policy conversations.',
-      ),
-      _Member(
-        name: 'Joseph Mensah',
-        role: 'Organizer',
-        institution: 'University of Ghana',
-        imagePath: 'assets/images/yellow.png',
-        memberCount: 'Executive',
-        contribution: 'Member Mobilization',
-        bio: 'Coordinates student outreach and volunteer teams.',
-      ),
-    ],
-    members: [
-      _Member(
-        name: 'Nana Adjei',
-        role: 'TESCON Member',
-        institution: 'University of Ghana',
-        imagePath: 'assets/images/man.png',
-        memberCount: 'Member',
-        contribution: 'Volunteer Support',
-        bio: 'Supports campus engagement and member participation.',
-      ),
-      _Member(
-        name: 'Esi Boateng',
-        role: 'TESCON Member',
-        institution: 'University of Ghana',
-        imagePath: 'assets/images/suit.png',
-        memberCount: 'Member',
-        contribution: 'Programs Support',
-        bio: 'Assists with chapter programs and event coordination.',
-      ),
-    ],
-    news: [
-      _ChapterUpdate(
-        title: 'UG TESCON opens new member registration drive',
-        source: 'University of Ghana',
-        date: 'Feb 23, 2025',
-      ),
-      _ChapterUpdate(
-        title: 'Chapter executives meet students ahead of campus forum',
-        source: 'University of Ghana',
-        date: 'Mar 02, 2025',
-      ),
-    ],
-    events: [
-      _ChapterEvent(
-        title: 'Campus Leadership Forum',
-        date: 'Mar 12, 2025',
-        location: 'Legon',
-      ),
-      _ChapterEvent(
-        title: 'Member Orientation',
-        date: 'Apr 04, 2025',
-        location: 'SRC Union',
-      ),
-    ],
-  ),
-  _CampusChapter(
-    name: 'Central University',
-    shortName: 'CU TESCON',
-    location: 'Miotso',
-    logoPath: 'assets/images/cu.jpg',
-    membersCount: 1240,
-    executivesCount: 12,
-    eventsCount: 8,
-    newsCount: 18,
-    description:
-        'Central University chapter manages campus announcements, leadership activities, event reporting, and member records for active TESCON members.',
-    executives: [
-      _Member(
-        name: 'Ama Serwaa Mensah',
-        role: 'Chapter President',
-        institution: 'Central University',
-        imagePath: 'assets/images/white.png',
-        memberCount: 'Executive',
-        contribution: 'Chapter Leadership',
-        bio:
-            'Leads chapter programs, membership drives, and campus policy conversations.',
-      ),
-      _Member(
-        name: 'Joseph Mensah',
-        role: 'Organizer',
-        institution: 'Central University',
-        imagePath: 'assets/images/yellow.png',
-        memberCount: 'Executive',
-        contribution: 'Member Mobilization',
-        bio: 'Coordinates student outreach and volunteer teams.',
-      ),
-    ],
-    members: [
-      _Member(
-        name: 'Nana Adjei',
-        role: 'TESCON Member',
-        institution: 'Central University',
-        imagePath: 'assets/images/man.png',
-        memberCount: 'Member',
-        contribution: 'Volunteer Support',
-        bio: 'Supports campus engagement and member participation.',
-      ),
-      _Member(
-        name: 'Esi Boateng',
-        role: 'TESCON Member',
-        institution: 'Central University',
-        imagePath: 'assets/images/suit.png',
-        memberCount: 'Member',
-        contribution: 'Programs Support',
-        bio: 'Assists with chapter programs and event coordination.',
-      ),
-    ],
-    news: [
-      _ChapterUpdate(
-        title: 'Central University TESCON opens new member registration drive',
-        source: 'Central University',
-        date: 'Feb 23, 2025',
-      ),
-      _ChapterUpdate(
-        title: 'Chapter executives meet students ahead of campus forum',
-        source: 'Central University',
-        date: 'Mar 02, 2025',
-      ),
-    ],
-    events: [
-      _ChapterEvent(
-        title: 'Campus Leadership Forum',
-        date: 'Mar 12, 2025',
-        location: 'Miotso',
-      ),
-      _ChapterEvent(
-        title: 'Member Orientation',
-        date: 'Apr 04, 2025',
-        location: 'Central University',
-      ),
-    ],
-  ),
-  _CampusChapter(
-    name: 'Ghana Communication Technology University',
-    shortName: 'GCTU TESCON',
-    location: 'Tesano, Accra',
-    logoPath: 'assets/images/gctu.jpg',
-    membersCount: 840,
-    executivesCount: 10,
-    eventsCount: 6,
-    newsCount: 14,
-    description:
-        'GCTU TESCON connects students interested in technology, public service, communication, and campus leadership development.',
-    executives: [
-      _Member(
-        name: 'Kojo Ali',
-        role: 'Communications Lead',
-        institution: 'GCTU',
-        imagePath: 'assets/images/man.png',
-        memberCount: 'Executive',
-        contribution: 'Media & Publicity',
-        bio:
-            'Coordinates chapter announcements, event media, and digital storytelling.',
-      ),
-      _Member(
-        name: 'Chris Lloyd Nii Kwesi',
-        role: 'Youth Organizer',
-        institution: 'GCTU',
-        imagePath: 'assets/images/suit.png',
-        memberCount: 'Executive',
-        contribution: 'Campus Mobilization',
-        bio: 'Supports chapter mobilization and youth programs.',
-      ),
-    ],
-    members: [
-      _Member(
-        name: 'Akua Mensah',
-        role: 'TESCON Member',
-        institution: 'GCTU',
-        imagePath: 'assets/images/white.png',
-        memberCount: 'Member',
-        contribution: 'Volunteer Support',
-        bio: 'Supports outreach, programs, and chapter activities.',
-      ),
-      _Member(
-        name: 'Kofi Aheto',
-        role: 'TESCON Member',
-        institution: 'GCTU',
-        imagePath: 'assets/images/yellow.png',
-        memberCount: 'Member',
-        contribution: 'Media Support',
-        bio: 'Assists with event updates and media documentation.',
-      ),
-    ],
-    news: [
-      _ChapterUpdate(
-        title: 'GCTU TESCON honors campus volunteers',
-        source: 'GCTU',
-        date: 'Feb 23, 2025',
-      ),
-      _ChapterUpdate(
-        title: 'Executives announce upcoming outreach schedule',
-        source: 'GCTU',
-        date: 'Mar 08, 2025',
-      ),
-    ],
-    events: [
-      _ChapterEvent(
-        title: 'Executive Social',
-        date: 'Mar 18, 2025',
-        location: 'Tesano',
-      ),
-      _ChapterEvent(
-        title: 'Campus Outreach Day',
-        date: 'Apr 12, 2025',
-        location: 'GCTU',
-      ),
-    ],
-  ),
-  _CampusChapter(
-    name: 'Ashesi University',
-    shortName: 'Ashesi TESCON',
-    location: 'Berekuso',
-    logoPath: 'assets/images/ahesi.png',
-    membersCount: 1520,
-    executivesCount: 14,
-    eventsCount: 9,
-    newsCount: 22,
-    description:
-        'Ashesi TESCON brings students together for leadership training, policy discussion, member development, and chapter events.',
-    executives: [
-      _Member(
-        name: 'Yaw Boakye',
-        role: 'Chapter President',
-        institution: 'Ashesi University',
-        imagePath: 'assets/images/man.png',
-        memberCount: 'Executive',
-        contribution: 'Chapter Leadership',
-        bio: 'Leads campus planning and chapter administration.',
-      ),
-      _Member(
-        name: 'Abena Osei',
-        role: 'Women Organizer',
-        institution: 'Ashesi University',
-        imagePath: 'assets/images/white.png',
-        memberCount: 'Executive',
-        contribution: 'Member Engagement',
-        bio: 'Coordinates women-focused member engagement activities.',
-      ),
-    ],
-    members: [
-      _Member(
-        name: 'Kwesi Appiah',
-        role: 'TESCON Member',
-        institution: 'Ashesi University',
-        imagePath: 'assets/images/suit.png',
-        memberCount: 'Member',
-        contribution: 'Programs Support',
-        bio: 'Supports programs and campus engagement.',
-      ),
-      _Member(
-        name: 'Afia Nyarko',
-        role: 'TESCON Member',
-        institution: 'Ashesi University',
-        imagePath: 'assets/images/yellow.png',
-        memberCount: 'Member',
-        contribution: 'Volunteer Support',
-        bio: 'Assists with member mobilization and outreach.',
-      ),
-    ],
-    news: [
-      _ChapterUpdate(
-        title: 'Ashesi TESCON prepares for leadership workshop',
-        source: 'Ashesi',
-        date: 'Mar 15, 2025',
-      ),
-      _ChapterUpdate(
-        title: 'Students join policy conversation on campus',
-        source: 'Ashesi',
-        date: 'Mar 21, 2025',
-      ),
-    ],
-    events: [
-      _ChapterEvent(
-        title: 'Leadership Workshop',
-        date: 'Apr 02, 2025',
-        location: 'Berekuso',
-      ),
-      _ChapterEvent(
-        title: 'Freshers Engagement',
-        date: 'Apr 20, 2025',
-        location: 'Ashesi University',
-      ),
-    ],
-  ),
-  _CampusChapter(
-    name: 'Ghana Institute of Management and Public Administration',
-    shortName: 'GIMPA TESCON',
-    location: 'Achimota, Accra',
-    logoPath: 'assets/images/gimpa.png',
-    membersCount: 690,
-    executivesCount: 9,
-    eventsCount: 5,
-    newsCount: 11,
-    description:
-        'GIMPA TESCON focuses on leadership, public administration, student civic engagement, and executive development programs.',
-    executives: [
-      _Member(
-        name: 'Dennis Ofori',
-        role: 'Chapter President',
-        institution: 'GIMPA',
-        imagePath: 'assets/images/suit.png',
-        memberCount: 'Executive',
-        contribution: 'Chapter Leadership',
-        bio: 'Leads chapter strategy and executive coordination.',
-      ),
-      _Member(
-        name: 'Efua Sarpong',
-        role: 'Secretary',
-        institution: 'GIMPA',
-        imagePath: 'assets/images/white.png',
-        memberCount: 'Executive',
-        contribution: 'Administration',
-        bio: 'Keeps records and coordinates chapter communication.',
-      ),
-    ],
-    members: [
-      _Member(
-        name: 'Kwame Adu',
-        role: 'TESCON Member',
-        institution: 'GIMPA',
-        imagePath: 'assets/images/man.png',
-        memberCount: 'Member',
-        contribution: 'Programs Support',
-        bio: 'Supports GIMPA chapter programs and outreach.',
-      ),
-      _Member(
-        name: 'Akosua Tetteh',
-        role: 'TESCON Member',
-        institution: 'GIMPA',
-        imagePath: 'assets/images/yellow.png',
-        memberCount: 'Member',
-        contribution: 'Volunteer Support',
-        bio: 'Assists with chapter mobilization and events.',
-      ),
-    ],
-    news: [
-      _ChapterUpdate(
-        title: 'GIMPA TESCON launches leadership discussion series',
-        source: 'GIMPA',
-        date: 'Mar 28, 2025',
-      ),
-      _ChapterUpdate(
-        title: 'Executives prepare public policy engagement',
-        source: 'GIMPA',
-        date: 'Apr 05, 2025',
-      ),
-    ],
-    events: [
-      _ChapterEvent(
-        title: 'Public Leadership Talk',
-        date: 'Apr 15, 2025',
-        location: 'GIMPA',
-      ),
-      _ChapterEvent(
-        title: 'Chapter Executive Meeting',
-        date: 'Apr 29, 2025',
-        location: 'Achimota',
-      ),
-    ],
-  ),
-  _CampusChapter(
-    name: 'Pentecost University',
-    shortName: 'Pentecost TESCON',
-    location: 'Sowutuom, Accra',
-    logoPath: 'assets/images/pentecoast.png',
-    membersCount: 720,
-    executivesCount: 8,
-    eventsCount: 4,
-    newsCount: 9,
-    description:
-        'Pentecost University TESCON supports campus engagement, member organization, and student leadership activities.',
-    executives: [
-      _Member(
-        name: 'Samuel Nartey',
-        role: 'Chapter President',
-        institution: 'Pentecost University',
-        imagePath: 'assets/images/man.png',
-        memberCount: 'Executive',
-        contribution: 'Chapter Leadership',
-        bio: 'Coordinates chapter direction and campus engagement.',
-      ),
-      _Member(
-        name: 'Mavis Asante',
-        role: 'Organizer',
-        institution: 'Pentecost University',
-        imagePath: 'assets/images/white.png',
-        memberCount: 'Executive',
-        contribution: 'Member Mobilization',
-        bio: 'Leads member mobilization and volunteer planning.',
-      ),
-    ],
-    members: [
-      _Member(
-        name: 'Joel Ansah',
-        role: 'TESCON Member',
-        institution: 'Pentecost University',
-        imagePath: 'assets/images/suit.png',
-        memberCount: 'Member',
-        contribution: 'Volunteer Support',
-        bio: 'Supports chapter outreach and event planning.',
-      ),
-      _Member(
-        name: 'Adwoa Frimpong',
-        role: 'TESCON Member',
-        institution: 'Pentecost University',
-        imagePath: 'assets/images/yellow.png',
-        memberCount: 'Member',
-        contribution: 'Programs Support',
-        bio: 'Assists with program coordination and member updates.',
-      ),
-    ],
-    news: [
-      _ChapterUpdate(
-        title: 'Pentecost TESCON organizes campus engagement drive',
-        source: 'Pentecost University',
-        date: 'Apr 11, 2025',
-      ),
-      _ChapterUpdate(
-        title: 'New volunteers join chapter outreach team',
-        source: 'Pentecost University',
-        date: 'Apr 20, 2025',
-      ),
-    ],
-    events: [
-      _ChapterEvent(
-        title: 'Campus Engagement Drive',
-        date: 'May 03, 2025',
-        location: 'Sowutuom',
-      ),
-      _ChapterEvent(
-        title: 'Member Strategy Session',
-        date: 'May 18, 2025',
-        location: 'Pentecost University',
-      ),
-    ],
-  ),
-  _CampusChapter(
-    name: 'Presbyterian University Ghana',
-    shortName: 'Presby TESCON',
-    location: 'Abetifi',
-    logoPath: 'assets/images/preb.png',
-    membersCount: 610,
-    executivesCount: 7,
-    eventsCount: 4,
-    newsCount: 8,
-    description:
-        'Presbyterian University TESCON keeps student members connected through chapter programs, executive coordination, and campus updates.',
-    executives: [
-      _Member(
-        name: 'Kwaku Boateng',
-        role: 'Chapter President',
-        institution: 'Presbyterian University Ghana',
-        imagePath: 'assets/images/suit.png',
-        memberCount: 'Executive',
-        contribution: 'Chapter Leadership',
-        bio: 'Leads chapter activity planning and member coordination.',
-      ),
-      _Member(
-        name: 'Linda Osei',
-        role: 'Communications Lead',
-        institution: 'Presbyterian University Ghana',
-        imagePath: 'assets/images/white.png',
-        memberCount: 'Executive',
-        contribution: 'Media & Publicity',
-        bio: 'Coordinates announcements and chapter media updates.',
-      ),
-    ],
-    members: [
-      _Member(
-        name: 'Prince Owusu',
-        role: 'TESCON Member',
-        institution: 'Presbyterian University Ghana',
-        imagePath: 'assets/images/man.png',
-        memberCount: 'Member',
-        contribution: 'Volunteer Support',
-        bio: 'Supports member outreach and chapter events.',
-      ),
-      _Member(
-        name: 'Maame Gyamfi',
-        role: 'TESCON Member',
-        institution: 'Presbyterian University Ghana',
-        imagePath: 'assets/images/yellow.png',
-        memberCount: 'Member',
-        contribution: 'Programs Support',
-        bio: 'Assists chapter programs and member registration.',
-      ),
-    ],
-    news: [
-      _ChapterUpdate(
-        title: 'Presby TESCON updates chapter activity calendar',
-        source: 'Presbyterian University',
-        date: 'May 06, 2025',
-      ),
-      _ChapterUpdate(
-        title: 'Executives meet student volunteers ahead of forum',
-        source: 'Presbyterian University',
-        date: 'May 14, 2025',
-      ),
-    ],
-    events: [
-      _ChapterEvent(
-        title: 'Student Leadership Forum',
-        date: 'May 24, 2025',
-        location: 'Abetifi',
-      ),
-      _ChapterEvent(
-        title: 'Chapter Members Meeting',
-        date: 'Jun 07, 2025',
-        location: 'Presbyterian University',
-      ),
-    ],
-  ),
-];
 
 // Logo-led chapter list tile.
 class _CampusChapterTile extends StatelessWidget {
@@ -850,7 +416,10 @@ class _ChapterHeroCard extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              _ChapterMetric(label: 'Members', value: '${chapter.membersCount}'),
+              _ChapterMetric(
+                label: 'Members',
+                value: '${chapter.membersCount}',
+              ),
               _ChapterMetric(
                 label: 'Executives',
                 value: '${chapter.executivesCount}',
@@ -866,10 +435,7 @@ class _ChapterHeroCard extends StatelessWidget {
 
 // Rounded logo container reused by list tiles and detail hero.
 class _ChapterLogoBox extends StatelessWidget {
-  const _ChapterLogoBox({
-    required this.logoPath,
-    required this.size,
-  });
+  const _ChapterLogoBox({required this.logoPath, required this.size});
 
   final String logoPath;
   final double size;
@@ -885,17 +451,25 @@ class _ChapterLogoBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(size * 0.22),
         border: Border.all(color: const Color(0xFFE8E8EF)),
       ),
-      child: Image.asset(logoPath, fit: BoxFit.contain),
+      child: logoPath.startsWith('http') || logoPath.startsWith('/')
+          ? CachedNetworkImage(
+              imageUrl: ApiConfig.mediaUrl(logoPath),
+              fit: BoxFit.contain,
+              placeholder: (_, _) => const _ShimmerBlock(
+                width: double.infinity,
+                height: double.infinity,
+                borderRadius: 10,
+              ),
+              errorWidget: (_, _, _) => const Icon(Icons.school_outlined),
+            )
+          : Image.asset(logoPath, fit: BoxFit.contain),
     );
   }
 }
 
 // Small statistic item under the chapter hero.
 class _ChapterMetric extends StatelessWidget {
-  const _ChapterMetric({
-    required this.label,
-    required this.value,
-  });
+  const _ChapterMetric({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -1017,10 +591,7 @@ class _ChapterDescription extends StatelessWidget {
 
 // Section wrapper for executives, members, news, and events.
 class _ChapterSection extends StatelessWidget {
-  const _ChapterSection({
-    required this.title,
-    required this.children,
-  });
+  const _ChapterSection({required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -1042,7 +613,24 @@ class _ChapterSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          ...children,
+          if (children.isEmpty)
+            _AppSurface(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              borderRadius: 16,
+              opacity: 0.68,
+              child: Text(
+                'No ${title.toLowerCase()} available yet.',
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF777777),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
+                ),
+              ),
+            )
+          else
+            ...children,
         ],
       ),
     );
@@ -1088,7 +676,7 @@ class _ChapterNewsTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  '${item.source} · ${item.date}',
+                  '${item.source} - ${item.date}',
                   style: GoogleFonts.inter(
                     color: const Color(0xFF777777),
                     fontSize: 11,

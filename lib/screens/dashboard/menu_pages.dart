@@ -58,7 +58,6 @@ class _DemoPageShell extends StatelessWidget {
   }
 }
 
-
 class _SearchablePageShell extends StatelessWidget {
   const _SearchablePageShell({
     required this.title,
@@ -109,18 +108,14 @@ class _SearchablePageShell extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            _DemoSearchField(
-              hintText: hintText,
-              onChanged: onChanged,
-            ),
+            _DemoSearchField(hintText: hintText, onChanged: onChanged),
             const SizedBox(height: 16),
             if (children.isEmpty)
               const _InfoCard(
                 item: _InfoItem(
                   title: 'No results found',
                   subtitle: 'Try another keyword',
-                  body:
-                      'Try another keyword to search the available records.',
+                  body: 'Try another keyword to search the available records.',
                   icon: Icons.search_off_rounded,
                 ),
               )
@@ -134,10 +129,7 @@ class _SearchablePageShell extends StatelessWidget {
 }
 
 class _DemoSearchField extends StatelessWidget {
-  const _DemoSearchField({
-    required this.hintText,
-    required this.onChanged,
-  });
+  const _DemoSearchField({required this.hintText, required this.onChanged});
 
   final String hintText;
   final ValueChanged<String> onChanged;
@@ -269,8 +261,9 @@ class _ActionInfoCardState extends State<_ActionInfoCard> {
                 ? null
                 : widget.onTap ?? () => setState(() => completed = true),
             style: FilledButton.styleFrom(
-              backgroundColor:
-                  completed ? const Color(0xFFBDBDBD) : const Color(0xFF34368C),
+              backgroundColor: completed
+                  ? const Color(0xFFBDBDBD)
+                  : const Color(0xFF34368C),
               foregroundColor: Colors.white,
             ),
             child: Text(completed ? 'Confirmed' : widget.actionLabel),
@@ -281,7 +274,6 @@ class _ActionInfoCardState extends State<_ActionInfoCard> {
     );
   }
 }
-
 
 class _MiniPill extends StatelessWidget {
   const _MiniPill({required this.text});
@@ -308,4 +300,3 @@ class _MiniPill extends StatelessWidget {
     );
   }
 }
-

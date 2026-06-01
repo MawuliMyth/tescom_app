@@ -21,96 +21,13 @@ class _JobsPageState extends State<_JobsPage> {
     'Volunteer',
   ];
 
-  final jobs = const [
-    _Job(
-      title: 'Communications Intern',
-      organization: 'Policy Youth Desk',
-      initials: 'PY',
-      location: 'Accra',
-      type: 'Internship',
-      salary: 'GHS 800/month',
-      workMode: 'Hybrid',
-      experience: 'Entry',
-      status: 'OPEN',
-      deadline: 'June 12, 2026',
-      description:
-          'Support media monitoring, event reporting, and digital content preparation for youth programs.',
-      requirements: [
-        'Strong writing and communication skills',
-        'Interest in public affairs and student leadership',
-        'Basic social media and content planning ability',
-        'Availability for program and event activities',
-      ],
-    ),
-    _Job(
-      title: 'National Service Assistant',
-      organization: 'Civic Engagement Office',
-      initials: 'CE',
-      location: 'Kumasi',
-      type: 'National Service',
-      salary: 'Allowance',
-      workMode: 'On-site',
-      experience: 'Graduate',
-      status: 'OPEN',
-      deadline: 'July 1, 2026',
-      description:
-          'Assist with research, member registration, program coordination, and stakeholder follow-ups.',
-      requirements: [
-        'Eligible for national service placement',
-        'Good organization and record-keeping skills',
-        'Comfortable working with chapter executives',
-        'Available for office and field coordination',
-      ],
-    ),
-    _Job(
-      title: 'Campus Ambassador',
-      organization: 'TESCON Opportunities Desk',
-      initials: 'TO',
-      location: 'Remote / Campus',
-      type: 'Volunteer',
-      salary: 'Volunteer',
-      workMode: 'Remote',
-      experience: 'Student',
-      status: 'FEATURED',
-      deadline: 'Open',
-      description:
-          'Represent the opportunities desk on campus and help members discover jobs, internships, and scholarships.',
-      requirements: [
-        'Active TESCON member on campus',
-        'Strong peer communication skills',
-        'Interest in helping students find opportunities',
-        'Ability to share weekly updates with members',
-      ],
-    ),
-    _Job(
-      title: 'Leadership Scholarship',
-      organization: 'Youth Development Fund',
-      initials: 'YD',
-      location: 'Ghana',
-      type: 'Scholarship',
-      salary: 'Award',
-      workMode: 'Nationwide',
-      experience: 'Student',
-      status: 'OPEN',
-      deadline: 'August 30, 2026',
-      description:
-          'Scholarship opportunity for student leaders with strong community and campus involvement.',
-      requirements: [
-        'Evidence of student leadership',
-        'Strong academic or community record',
-        'Active involvement in campus programs',
-        'Complete application before the deadline',
-      ],
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<AppBootstrap>(
       future: AppRepository().loadBootstrap(),
       builder: (context, snapshot) {
         final apiJobs = snapshot.data?.jobs.map(_jobFromApi).toList();
-        final sourceJobs = apiJobs == null || apiJobs.isEmpty ? jobs : apiJobs;
+        final sourceJobs = apiJobs ?? const <_Job>[];
         final filtered = sourceJobs.where((job) {
           final filterMatch =
               selectedFilter == 'All' || job.type == selectedFilter;
@@ -139,8 +56,6 @@ class _JobsPageState extends State<_JobsPage> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
               children: [
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  const Center(child: CircularProgressIndicator()),
                 Text(
                   'Search internships, jobs, scholarships, national service, and youth development opportunities.',
                   textAlign: TextAlign.center,
@@ -173,7 +88,11 @@ class _JobsPageState extends State<_JobsPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                if (filtered.isEmpty)
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const _ListShimmer(itemCount: 4)
+                else if (snapshot.hasError)
+                  const _InlineErrorState()
+                else if (filtered.isEmpty)
                   const _EmptyJobsState()
                 else
                   ...filtered.map((job) => _JobCard(job: job)),
@@ -196,6 +115,7 @@ class _JobsPageState extends State<_JobsPage> {
       title: job.title,
       organization: job.company,
       initials: words.isEmpty ? 'TS' : words,
+      logoUrl: job.logoUrl,
       location: job.location,
       type: job.type,
       salary: 'See details',
@@ -220,6 +140,7 @@ class _Job {
     required this.title,
     required this.organization,
     required this.initials,
+    this.logoUrl,
     required this.location,
     required this.type,
     required this.salary,
@@ -234,6 +155,7 @@ class _Job {
   final String title;
   final String organization;
   final String initials;
+  final String? logoUrl;
   final String location;
   final String type;
   final String salary;
@@ -255,75 +177,8 @@ class _Job {
   }
 }
 
-// Green welcome block at the top of the job board.
-class _JobsWelcomeHeader extends StatelessWidget {
-  const _JobsWelcomeHeader({
-    required this.onBack,
-    required this.onNotify,
-  });
-
-  final VoidCallback onBack;
-  final VoidCallback onNotify;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF34368C), Color(0xFF5A5CC6)],
-        ),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          _JobHeaderButton(icon: Icons.arrow_back_rounded, onTap: onBack),
-          const SizedBox(width: 12),
-          const CircleAvatar(
-            radius: 18,
-            backgroundImage: AssetImage('assets/images/suit.png'),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome back',
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  'Find jobs, internships, service, and scholarships.',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    color: Colors.white.withValues(alpha: 0.78),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _JobHeaderButton(icon: Icons.notifications_none_rounded, onTap: onNotify),
-        ],
-      ),
-    );
-  }
-}
-
 class _JobHeaderButton extends StatelessWidget {
-  const _JobHeaderButton({
-    required this.icon,
-    required this.onTap,
-  });
+  const _JobHeaderButton({required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback onTap;
@@ -346,144 +201,6 @@ class _JobHeaderButton extends StatelessWidget {
   }
 }
 
-class _JobsSearchBar extends StatelessWidget {
-  const _JobsSearchBar({required this.onChanged});
-
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return _AppSurface(
-      borderRadius: 16,
-      opacity: 0.9,
-      child: TextField(
-        onChanged: onChanged,
-        decoration: const InputDecoration(
-          hintText: 'Search for a title, organization, or location',
-          prefixIcon: Icon(Icons.search_rounded),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(vertical: 16),
-        ),
-      ),
-    );
-  }
-}
-
-class _TopCompaniesPanel extends StatelessWidget {
-  const _TopCompaniesPanel({required this.jobs});
-
-  final List<_Job> jobs;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF34368C), Color(0xFF5A5CC6)],
-        ),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Top Organizations',
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                'View All',
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: jobs.map((job) {
-                return Container(
-                  margin: const EdgeInsets.only(right: 10),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      _JobInitialsBadge(initials: job.initials),
-                      const SizedBox(width: 8),
-                      Text(
-                        job.organization,
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _JobsSectionHeader extends StatelessWidget {
-  const _JobsSectionHeader({
-    required this.title,
-    required this.actionText,
-  });
-
-  final String title;
-  final String actionText;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          title,
-          style: GoogleFonts.inter(
-            color: const Color(0xFF34368C),
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0,
-          ),
-        ),
-        const Spacer(),
-        Text(
-          actionText,
-          style: GoogleFonts.inter(
-            color: const Color(0xFF34368C),
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _JobCard extends StatelessWidget {
   const _JobCard({required this.job});
 
@@ -495,10 +212,7 @@ class _JobCard extends StatelessWidget {
       onTap: () {
         Navigator.push(
           context,
-          _adaptivePageRoute(
-            context,
-            builder: (_) => _JobDetailPage(job: job),
-          ),
+          _adaptivePageRoute(context, builder: (_) => _JobDetailPage(job: job)),
         );
       },
       borderRadius: BorderRadius.circular(16),
@@ -512,6 +226,8 @@ class _JobCard extends StatelessWidget {
           children: [
             Row(
               children: [
+                _JobLogoBadge(initials: job.initials, logoUrl: job.logoUrl),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     job.title,
@@ -563,21 +279,56 @@ class _JobCard extends StatelessWidget {
   }
 }
 
-class _JobInitialsBadge extends StatelessWidget {
-  const _JobInitialsBadge({required this.initials});
+class _JobLogoBadge extends StatelessWidget {
+  const _JobLogoBadge({required this.initials, this.logoUrl, this.radius = 22});
 
   final String initials;
+  final String? logoUrl;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final source = logoUrl;
+    if (source != null && source.trim().isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: const Color(0xFFEFEFFC),
+        child: ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: ApiConfig.mediaUrl(source),
+            width: radius * 2,
+            height: radius * 2,
+            fit: BoxFit.cover,
+            placeholder: (_, _) => _ShimmerBlock(
+              width: radius * 2,
+              height: radius * 2,
+              borderRadius: radius,
+            ),
+            errorWidget: (_, _, _) => _JobInitialsMark(initials: initials),
+          ),
+        ),
+      );
+    }
+    return _JobInitialsMark(initials: initials, radius: radius);
+  }
+}
+
+class _JobInitialsMark extends StatelessWidget {
+  const _JobInitialsMark({required this.initials, this.radius = 22});
+
+  final String initials;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
     return CircleAvatar(
-      radius: 22,
+      radius: radius,
       backgroundColor: const Color(0xFF34368C),
       child: Text(
         initials,
         style: GoogleFonts.inter(
           color: Colors.white,
-          fontSize: 13,
+          fontSize: radius > 24 ? 15 : 13,
           fontWeight: FontWeight.w900,
           letterSpacing: 0,
         ),
@@ -709,7 +460,9 @@ class _JobDetailPageState extends State<_JobDetailPage> {
               right: 18,
               bottom: 24,
               child: FilledButton(
-                onPressed: applied ? null : () => setState(() => applied = true),
+                onPressed: applied
+                    ? null
+                    : () => setState(() => applied = true),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF34368C),
                   foregroundColor: Colors.white,
@@ -757,9 +510,7 @@ class _JobDetailHeader extends StatelessWidget {
         gradient: const LinearGradient(
           colors: [Color(0xFF34368C), Color(0xFF5A5CC6)],
         ),
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(28),
-        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
       ),
       child: Row(
         children: [
@@ -779,7 +530,9 @@ class _JobDetailHeader extends StatelessWidget {
             ),
           ),
           _JobHeaderButton(
-            icon: saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+            icon: saved
+                ? Icons.bookmark_rounded
+                : Icons.bookmark_border_rounded,
             onTap: onSave,
           ),
         ],
@@ -804,7 +557,11 @@ class _JobDetailSummary extends StatelessWidget {
         children: [
           Row(
             children: [
-              _JobInitialsBadge(initials: job.initials),
+              _JobLogoBadge(
+                initials: job.initials,
+                logoUrl: job.logoUrl,
+                radius: 26,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -853,10 +610,7 @@ class _JobDetailSummary extends StatelessWidget {
 }
 
 class _JobDetailSection extends StatelessWidget {
-  const _JobDetailSection({
-    required this.title,
-    required this.body,
-  });
+  const _JobDetailSection({required this.title, required this.body});
 
   final String title;
   final String body;
@@ -919,11 +673,7 @@ class _JobRequirements extends StatelessWidget {
               children: [
                 const Padding(
                   padding: EdgeInsets.only(top: 5),
-                  child: Icon(
-                    Icons.circle,
-                    color: Color(0xFF34368C),
-                    size: 9,
-                  ),
+                  child: Icon(Icons.circle, color: Color(0xFF34368C), size: 9),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

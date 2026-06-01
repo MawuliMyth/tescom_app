@@ -50,4 +50,3 @@ class _HistoryPageState extends State<_HistoryPage> {
     );
   }
 }
-

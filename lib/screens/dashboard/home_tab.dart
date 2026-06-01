@@ -29,7 +29,6 @@ class _DashboardHome extends StatelessWidget {
                     builder: (_) => const _LatestNewsPage(),
                   ),
                 ),
-
               ),
               const SizedBox(height: 10),
 

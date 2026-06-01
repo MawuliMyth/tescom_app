@@ -18,8 +18,6 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredMembers = _filterMembers(_members);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFF),
       body: _AppScaffoldBackground(
@@ -30,47 +28,79 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
             children: [
               _MemberDirectoryTopBar(onBack: () => Navigator.pop(context)),
               const SizedBox(height: 12),
-              _MemberDirectoryIntro(count: filteredMembers.length),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _MemberSearchField(
-                      hintText: 'Search by name',
-                      onChanged: (value) => setState(() => query = value),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  _SmartMemberFilterButton(
-                    selectedSchool: selectedSchool,
-                    selectedRole: selectedRole,
-                    schools: _schools,
-                    roles: _roles,
-                    onApply: (school, role) {
-                      setState(() {
-                        selectedSchool = school;
-                        selectedRole = role;
-                      });
-                    },
-                  ),
-                ],
+              FutureBuilder<List<AppUser>>(
+                future: AppRepository().loadMembers(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 34),
+                      child: _ListShimmer(itemCount: 4),
+                    );
+                  }
+                  if (snapshot.hasError) return const _InlineErrorState();
+
+                  final members = (snapshot.data ?? const [])
+                      .map(_Member.fromUser)
+                      .toList();
+                  final filteredMembers = _filterMembers(members);
+                  final schools = [
+                    'All',
+                    ...{for (final member in members) member.institution},
+                  ];
+                  final roles = [
+                    'All',
+                    ...{for (final member in members) member.role},
+                  ];
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _MemberDirectoryIntro(count: filteredMembers.length),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _MemberSearchField(
+                              hintText: 'Search by name',
+                              onChanged: (value) =>
+                                  setState(() => query = value),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          _SmartMemberFilterButton(
+                            selectedSchool: selectedSchool,
+                            selectedRole: selectedRole,
+                            schools: schools,
+                            roles: roles,
+                            onApply: (school, role) {
+                              setState(() {
+                                selectedSchool = school;
+                                selectedRole = role;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      if (selectedSchool != 'All' || selectedRole != 'All') ...[
+                        const SizedBox(height: 10),
+                        _ActiveFilterSummary(
+                          selectedSchool: selectedSchool,
+                          selectedRole: selectedRole,
+                        ),
+                      ],
+                      const SizedBox(height: 18),
+                      const _MemberListLabel(label: 'Members'),
+                      const SizedBox(height: 10),
+                      if (filteredMembers.isEmpty)
+                        const _EmptyMemberState()
+                      else
+                        ...filteredMembers.map(
+                          (member) => _MemberCard(member: member),
+                        ),
+                    ],
+                  );
+                },
               ),
-              if (selectedSchool != 'All' || selectedRole != 'All') ...[
-                const SizedBox(height: 10),
-                _ActiveFilterSummary(
-                  selectedSchool: selectedSchool,
-                  selectedRole: selectedRole,
-                ),
-              ],
-              const SizedBox(height: 18),
-              const _MemberListLabel(label: 'Members'),
-              const SizedBox(height: 10),
-              if (filteredMembers.isEmpty)
-                const _EmptyMemberState()
-              else
-                ...filteredMembers.map(
-                  (member) => _MemberCard(member: member),
-                ),
             ],
           ),
         ),
@@ -89,58 +119,6 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
     }).toList();
   }
 }
-
-// Static demo data for the directory until live member data is connected.
-const _members = [
-  _Member(
-    name: 'Chris Lloyd Nii Kwesi',
-    role: 'Youth Organizer',
-    institution: 'National TESCON',
-    imagePath: 'assets/images/suit.png',
-    joinDate: 'Joined 2024',
-    memberCount: 'Member',
-    contribution: 'Campus Mobilization',
-    bio:
-        'Youth organizer focused on student mobilization, communication, and campus chapter development.',
-  ),
-  _Member(
-    name: 'Ama Serwaa Mensah',
-    role: 'Chapter President',
-    institution: 'University of Ghana',
-    imagePath: 'assets/images/white.png',
-    joinDate: 'Joined 2024',
-    memberCount: 'Executive',
-    contribution: 'Chapter Leadership',
-    bio:
-        'Leads chapter programs, membership drives, and campus policy conversations for student members.',
-  ),
-  _Member(
-    name: 'Kojo Ali',
-    role: 'Communications Lead',
-    institution: 'Central University',
-    imagePath: 'assets/images/man.png',
-    joinDate: 'Joined 2025',
-    memberCount: 'Member',
-    contribution: 'Media & Publicity',
-    bio:
-        'Coordinates chapter announcements, event media, and digital storytelling for the member directory.',
-  ),
-  _Member(
-    name: 'Joseph Mensah',
-    role: 'TESCON Member',
-    institution: 'Central University',
-    imagePath: 'assets/images/yellow.png',
-    joinDate: 'Joined 2025',
-    memberCount: 'Member',
-    contribution: 'Volunteer Support',
-    bio:
-        'Supports campus outreach, volunteer coordination, and member engagement activities.',
-  ),
-];
-
-// Filter options are derived from the same demo dataset used by the list.
-final _schools = ['All', ...{for (final member in _members) member.institution}];
-final _roles = ['All', ...{for (final member in _members) member.role}];
 
 // Header row with back button and centered page title.
 class _MemberDirectoryTopBar extends StatelessWidget {
@@ -250,10 +228,7 @@ class _MemberCountPill extends StatelessWidget {
 
 // Search box shared by membership and executive screens.
 class _MemberSearchField extends StatelessWidget {
-  const _MemberSearchField({
-    required this.hintText,
-    required this.onChanged,
-  });
+  const _MemberSearchField({required this.hintText, required this.onChanged});
 
   final String hintText;
   final ValueChanged<String> onChanged;

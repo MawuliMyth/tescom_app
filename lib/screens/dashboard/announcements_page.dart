@@ -16,11 +16,21 @@ class _AnnouncementsPage extends StatelessWidget {
           future: AppRepository().loadBootstrap(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const _ListShimmer(itemCount: 2);
             }
+            if (snapshot.hasError) return const _InlineErrorState();
 
             final announcements = snapshot.data?.announcements ?? const [];
-            if (announcements.isEmpty) return const _AnnouncementFallbackList();
+            if (announcements.isEmpty) {
+              return const _InfoCard(
+                item: _InfoItem(
+                  title: 'No announcements yet',
+                  subtitle: 'Admin dashboard',
+                  body: 'Published announcements will appear here.',
+                  icon: Icons.campaign_outlined,
+                ),
+              );
+            }
 
             return Column(
               children: announcements.map((announcement) {
@@ -40,34 +50,3 @@ class _AnnouncementsPage extends StatelessWidget {
     );
   }
 }
-
-class _AnnouncementFallbackList extends StatelessWidget {
-  const _AnnouncementFallbackList();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        _InfoCard(
-          item: _InfoItem(
-            title: 'Membership Update',
-            subtitle: 'National Secretariat',
-            body:
-                'All campus chapters are encouraged to update their member lists before the next engagement.',
-            icon: Icons.campaign_outlined,
-          ),
-        ),
-        _InfoCard(
-          item: _InfoItem(
-            title: 'Event Media Submission',
-            subtitle: 'Communications Desk',
-            body:
-                'Chapter media teams can prepare event photos and reports for publication.',
-            icon: Icons.photo_library_outlined,
-          ),
-        ),
-      ],
-    );
-  }
-}
-

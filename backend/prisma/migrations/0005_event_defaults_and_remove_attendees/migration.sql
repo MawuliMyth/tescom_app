@@ -1,0 +1,2 @@
+ALTER TABLE "Event" DROP COLUMN "attendeeImageUrls";
+ALTER TABLE "Event" ALTER COLUMN "status" SET DEFAULT 'PUBLISHED';

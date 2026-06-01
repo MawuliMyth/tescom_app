@@ -102,11 +102,7 @@ class _DiscoverSearchBar extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(
-              Icons.tune_rounded,
-              color: Color(0xFF9A9A9A),
-              size: 18,
-            ),
+            const Icon(Icons.tune_rounded, color: Color(0xFF9A9A9A), size: 18),
           ],
         ),
       ),
@@ -146,11 +142,7 @@ class _DiscoverFilters extends StatelessWidget {
 }
 
 class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    this.selected = false,
-    this.onTap,
-  });
+  const _FilterChip({required this.label, this.selected = false, this.onTap});
 
   final String label;
   final bool selected;
@@ -187,71 +179,65 @@ class _DiscoverNewsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const items = [
-      _DiscoverNewsTile(
-          imagePath: 'assets/images/card.png',
-          authorImagePath: 'assets/images/suit.png',
-          source: 'From Npp Head Office',
-          title: 'National Delegates Conference 2025 is happening Tomorrow',
-          author: 'Chris Lloyd',
-          date: 'Jul 19, 2025.',
-        ),
-      _DiscoverNewsTile(
-          imagePath: 'assets/images/give.png',
-          authorImagePath: 'assets/images/white.png',
-          source: 'From Tescon UCC',
-          title: 'Ken Ohene Agyapong Speaks on Entrepreneurship',
-          author: 'Baron',
-          date: 'April 23, 2025.',
-        ),
-      _DiscoverNewsTile(
-          imagePath: 'assets/images/ladies.png',
-          authorImagePath: 'assets/images/man.png',
-          source: 'From Tescon Central University',
-          title: 'Samira Bawumiah Calls for NPP loyal Ladies',
-          author: 'James Kofi',
-          date: 'July 10, 2025.',
-        ),
-      _DiscoverNewsTile(
-          imagePath: 'assets/images/suit.png',
-          authorImagePath: 'assets/images/man.png',
-          source: 'From Tescon Central University',
-          title: 'Samira Bawumiah Calls for NPP loyal Ladies',
-          author: 'kojo Ali',
-          date: 'July 10, 2025.',
-        ),
-      _DiscoverNewsTile(
-          imagePath: 'assets/images/coursel_image.png',
-          authorImagePath: 'assets/images/wayo.png',
-          source: 'From Tescon VVU',
-          title: 'Samira Bawumiah Calls for NPP loyal Ladies',
-          author: 'Prince Yeboah',
-          date: 'July 10, 2025.',
-        ),
-    ];
+    return FutureBuilder<AppBootstrap>(
+      future: AppRepository().loadBootstrap(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const _ListShimmer(itemCount: 4);
+        }
+        if (snapshot.hasError) return const _InlineErrorState();
 
-    final visible = filter == 'All'
-        ? items
-        : items.where((item) => item.source.toLowerCase().contains(filter.toLowerCase())).toList();
+        final articles = snapshot.data?.news ?? const [];
+        final visible = filter == 'All'
+            ? articles
+            : articles
+                  .where(
+                    (item) => (item.category ?? '').toLowerCase().contains(
+                      filter.toLowerCase(),
+                    ),
+                  )
+                  .toList();
 
-    if (visible.isEmpty) {
-      return const _InfoCard(
-        item: _InfoItem(
-          title: 'No stories in this filter',
-          subtitle: 'Try another category',
-          body: 'Filtered stories will appear here when available.',
-          icon: Icons.filter_alt_off_rounded,
-        ),
-      );
-    }
+        if (visible.isEmpty) {
+          return const _InfoCard(
+            item: _InfoItem(
+              title: 'No stories yet',
+              subtitle: 'Admin dashboard',
+              body: 'Published stories will appear here.',
+              icon: Icons.filter_alt_off_rounded,
+            ),
+          );
+        }
 
-    return Column(
-      children: [
-        for (final item in visible) ...[
-          item,
-          if (item != visible.last) const SizedBox(height: 15),
-        ],
-      ],
+        return Column(
+          children: [
+            for (final article in visible) ...[
+              Builder(
+                builder: (context) {
+                  final imagePaths = _contentImages(
+                    article.imageUrls,
+                    article.imageUrl,
+                  );
+                  return _DiscoverNewsTile(
+                    imagePath: imagePaths.first,
+                    imagePaths: imagePaths,
+                    authorImagePath: 'assets/images/logo.png',
+                    source: article.category ?? 'TESCON',
+                    title: article.title,
+                    author: 'TESCON',
+                    date: _friendlyDate(
+                      article.publishedAt ?? article.createdAt,
+                    ),
+                    body: article.body,
+                    itemId: article.id,
+                  );
+                },
+              ),
+              if (article != visible.last) const SizedBox(height: 15),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -259,19 +245,25 @@ class _DiscoverNewsList extends StatelessWidget {
 class _DiscoverNewsTile extends StatelessWidget {
   const _DiscoverNewsTile({
     required this.imagePath,
+    this.imagePaths = const [],
     required this.authorImagePath,
     required this.source,
     required this.title,
     required this.author,
     required this.date,
+    this.body,
+    this.itemId,
   });
 
   final String imagePath;
+  final List<String> imagePaths;
   final String authorImagePath;
   final String source;
   final String title;
   final String author;
   final String date;
+  final String? body;
+  final String? itemId;
 
   @override
   Widget build(BuildContext context) {
@@ -279,11 +271,14 @@ class _DiscoverNewsTile extends StatelessWidget {
       onTap: () => _openNewsDetail(
         context,
         imagePath: imagePath,
+        imagePaths: imagePaths,
         authorImagePath: authorImagePath,
         source: source,
         title: title,
         author: author,
         date: date,
+        body: body,
+        itemId: itemId,
       ),
       borderRadius: BorderRadius.circular(8),
       child: Row(
@@ -291,11 +286,10 @@ class _DiscoverNewsTile extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
-            child: Image.asset(
-              imagePath,
+            child: _DashboardContentImage(
+              path: imagePath,
               width: 118,
               height: 86,
-              fit: BoxFit.cover,
             ),
           ),
           const SizedBox(width: 8),
@@ -305,18 +299,8 @@ class _DiscoverNewsTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    source,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFF7B7B7B),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
+                  _NewsCategoryText(label: source),
+                  const SizedBox(height: 6),
                   Text(
                     title,
                     maxLines: 3,
@@ -360,7 +344,6 @@ class _DiscoverNewsTile extends StatelessWidget {
                           letterSpacing: 0,
                         ),
                       ),
-
                     ],
                   ),
                 ],

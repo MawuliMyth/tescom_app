@@ -12,119 +12,49 @@ class _SavedScreen extends StatelessWidget {
           bottom: false,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 36, 18, 22),
-            children: const [
-              _SimplePageTitle(
+            children: [
+              const _SimplePageTitle(
                 title: 'Saved News',
                 subtitle: 'Stories bookmarked for later',
               ),
-              SizedBox(height: 18),
-              _RecommendationTile(
-                imagePath: 'assets/images/man.png',
-                authorImagePath: 'assets/images/pres.png',
-                source: 'Saved from NPP Youth Organizer',
-                title: 'Bawumiah is the man for the Job',
-                author: 'Chris Lloyd',
-                date: '6 Hours Ago',
-              ),
-              SizedBox(height: 14),
-              _RecommendationTile(
-                imagePath: 'assets/images/card.png',
-                authorImagePath: 'assets/images/suit.png',
-                source: 'Saved from Npp Head Office',
-                title: 'National Delegates Conference 2025 is happening Tomorrow',
-                author: 'Chris Lloyd',
-                date: 'Jul 19, 2025.',
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+              const SizedBox(height: 18),
+              FutureBuilder<List<Object>>(
+                future: Future.wait([
+                  AppRepository().loadSavedItems(),
+                  AppRepository().loadBootstrap(),
+                ]),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const _ListShimmer(itemCount: 3);
+                  }
+                  if (snapshot.hasError) return const _InlineErrorState();
 
-class _ProfileScreen extends StatelessWidget {
-  const _ProfileScreen();
+                  final savedItems =
+                      snapshot.data?[0] as List<AppSavedItem>? ?? const [];
+                  final bootstrap = snapshot.data?[1] as AppBootstrap?;
+                  final savedNewsIds = savedItems
+                      .where((item) => item.itemType == 'NEWS')
+                      .map((item) => item.itemId)
+                      .toSet();
+                  final savedNews = (bootstrap?.news ?? const [])
+                      .where((article) => savedNewsIds.contains(article.id))
+                      .toList();
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFF),
-      body: _AppScaffoldBackground(
-        child: SafeArea(
-          bottom: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 36, 18, 22),
-            children: [
-              const _SimplePageTitle(
-                title: 'Profile',
-                subtitle: 'Member account',
-              ),
-              const SizedBox(height: 24),
-              _AppSurface(
-                padding: const EdgeInsets.all(14),
-                borderRadius: 22,
-                opacity: 0.68,
-                child: Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 34,
-                      backgroundImage: AssetImage('assets/images/suit.png'),
-                    ),
-                    const SizedBox(width: 14),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Tescon Member',
-                          style: GoogleFonts.inter(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Central University Chapter',
-                          style: GoogleFonts.inter(
-                            color: const Color(0xFF777777),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 28),
-              _DrawerTile(
-                icon: Icons.edit_outlined,
-                title: 'Edit Profile',
-                onTap: () => _showDemoSheet(
-                  context,
-                  title: 'Edit Profile',
-                  message: 'Profile editing is ready.',
-                ),
-              ),
-              _DrawerTile(
-                icon: Icons.notifications_active_outlined,
-                title: 'Notification Settings',
-                onTap: () => _showDemoSheet(
-                  context,
-                  title: 'Notification Settings',
-                  message: 'Notification preferences opened successfully.',
-                ),
-              ),
-              _DrawerTile(
-                icon: Icons.help_outline_rounded,
-                title: 'Help Center',
-                onTap: () => _showDemoSheet(
-                  context,
-                  title: 'Help Center',
-                  message: 'Help center content is ready.',
-                ),
+                  if (savedNews.isEmpty) {
+                    return const _InfoCard(
+                      item: _InfoItem(
+                        title: 'No saved news yet',
+                        subtitle: 'Bookmarks',
+                        body: 'Saved news from the app will appear here.',
+                        icon: Icons.bookmark_border_rounded,
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: savedNews.map(_ApiNewsTile.new).toList(),
+                  );
+                },
               ),
             ],
           ),
@@ -135,10 +65,7 @@ class _ProfileScreen extends StatelessWidget {
 }
 
 class _SimplePageTitle extends StatelessWidget {
-  const _SimplePageTitle({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SimplePageTitle({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;

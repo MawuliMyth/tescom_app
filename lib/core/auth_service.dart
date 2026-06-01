@@ -13,7 +13,23 @@ class AuthService {
   final ApiClient _apiClient;
   final TokenStorage _tokenStorage;
 
-  Future<bool> hasSession() => _tokenStorage.hasRefreshSession();
+  Future<bool> hasSession() async {
+    if (!await _tokenStorage.hasRefreshSession()) return false;
+    if (await _tokenStorage.hasValidAccessSession()) return true;
+
+    try {
+      await _apiClient.refreshSession();
+      return true;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        await _tokenStorage.clear();
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return true;
+    }
+  }
 
   Future<void> signIn({required String email, required String password}) async {
     final data = await _apiClient.post(
@@ -48,10 +64,10 @@ class AuthService {
   Future<void> logout() async {
     final refreshToken = await _tokenStorage.readRefreshToken();
     try {
-      await _apiClient.post(
-        '/api/auth/logout',
-        body: {'refreshToken': refreshToken},
-      );
+      final body = refreshToken == null
+          ? <String, dynamic>{}
+          : {'refreshToken': refreshToken};
+      await _apiClient.post('/api/auth/logout', body: body);
     } finally {
       await _tokenStorage.clear();
     }

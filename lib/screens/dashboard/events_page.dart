@@ -6,90 +6,18 @@ part of '../dashboard_screen.dart';
 class _EventsPage extends StatelessWidget {
   const _EventsPage();
 
-  static const List<_EventItem> _currentEvents = [
-    _EventItem(
-      imagePath: 'assets/images/coursel_image.png',
-      title: 'TESCON Campus Leadership Forum',
-      organizer: 'TESCON Global Community Events',
-      dateLabel: '10:00 PM',
-      location: 'Accra',
-      status: 'Going On',
-      priceLabel: 'Free',
-      day: '29',
-      month: 'JAN',
-      details:
-          'Campus leaders, organizers, and members will gather for strategy conversations, networking, and student-focused mobilization.',
-    ),
-    _EventItem(
-      imagePath: 'assets/images/give.png',
-      title: 'Chapter Executive Social',
-      organizer: 'TESCON Central University',
-      dateLabel: '2:00 PM',
-      location: 'Kumasi',
-      status: 'Going On',
-      priceLabel: 'Free',
-      day: '06',
-      month: 'FEB',
-      details:
-          'A relaxed member meet-up for chapter executives to share plans, build relationships, and coordinate upcoming campus activities.',
-    ),
-  ];
-
-  static const List<_EventItem> _upcomingEvents = [
-    _EventItem(
-      imagePath: 'assets/images/ladies.png',
-      title: 'Women in TESCON Networking Brunch',
-      organizer: 'TESCON National Secretariat',
-      dateLabel: '10:00 AM',
-      location: 'West Legon',
-      status: 'In 25 Min',
-      priceLabel: 'Paid',
-      day: '29',
-      month: 'JAN',
-      fee: 'GHS 150.00',
-      details:
-          'A focused gathering for women in TESCON to connect, share leadership experiences, and discuss stronger participation on campus.',
-    ),
-    _EventItem(
-      imagePath: 'assets/images/give.png',
-      title: 'Entrepreneurship and Social Networking',
-      organizer: 'TESCON UCC',
-      dateLabel: '4:30 PM',
-      location: 'Cape Coast',
-      status: 'In 2 Days',
-      priceLabel: 'Free',
-      day: '12',
-      month: 'FEB',
-      details:
-          'A practical session for students interested in entrepreneurship, public service, and building useful professional relationships.',
-    ),
-    _EventItem(
-      imagePath: 'assets/images/card.png',
-      title: 'National Delegates Conference',
-      organizer: 'TESCON National Secretariat',
-      dateLabel: '9:00 AM',
-      location: 'Accra',
-      status: 'Upcoming',
-      priceLabel: 'Free',
-      day: '19',
-      month: 'JUL',
-      details:
-          'Official conference updates, student delegation coordination, and media briefings for campus representatives.',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<AppBootstrap>(
       future: AppRepository().loadBootstrap(),
       builder: (context, snapshot) {
-        final apiEvents = snapshot.data?.events.map(_eventFromApi).toList();
-        final currentEvents = apiEvents == null || apiEvents.isEmpty
-            ? _currentEvents
-            : apiEvents.take(2).toList();
-        final upcomingEvents = apiEvents == null || apiEvents.length <= 2
-            ? _upcomingEvents
-            : apiEvents.skip(2).toList();
+        final events = snapshot.data?.events.map(_eventFromApi).toList() ?? [];
+        final currentEvents = events
+            .where((event) => event.status == 'Going On')
+            .toList();
+        final upcomingEvents = events
+            .where((event) => event.status != 'Going On')
+            .toList();
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFF),
@@ -122,26 +50,47 @@ class _EventsPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 28),
                   if (snapshot.connectionState == ConnectionState.waiting)
-                    const Center(child: CircularProgressIndicator()),
-                  const _EventSectionTitle('Current Events'),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    height: 252,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: currentEvents.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 14),
-                      itemBuilder: (context, index) {
-                        return _CurrentEventCard(event: currentEvents[index]);
-                      },
+                    const _ListShimmer(itemCount: 3)
+                  else if (snapshot.hasError)
+                    const _InlineErrorState()
+                  else if (events.isEmpty)
+                    const _InfoCard(
+                      item: _InfoItem(
+                        title: 'No events yet',
+                        subtitle: 'Admin dashboard',
+                        body: 'Published events will appear here.',
+                        icon: Icons.event_busy_outlined,
+                      ),
+                    )
+                  else ...[
+                    const _EventSectionTitle('Current Events'),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      height: 252,
+                      child: currentEvents.isEmpty
+                          ? const _EmptyEventGroup()
+                          : ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: currentEvents.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: 14),
+                              itemBuilder: (context, index) {
+                                return _CurrentEventCard(
+                                  event: currentEvents[index],
+                                );
+                              },
+                            ),
                     ),
-                  ),
-                  const SizedBox(height: 26),
-                  const _EventSectionTitle('Upcoming Events'),
-                  const SizedBox(height: 14),
-                  ...upcomingEvents.map(
-                    (event) => _UpcomingEventCard(event: event),
-                  ),
+                    const SizedBox(height: 26),
+                    const _EventSectionTitle('Upcoming Events'),
+                    const SizedBox(height: 14),
+                    if (upcomingEvents.isEmpty)
+                      const _EmptyEventGroup()
+                    else
+                      ...upcomingEvents.map(
+                        (event) => _UpcomingEventCard(event: event),
+                      ),
+                  ],
                 ],
               ),
             ),
@@ -152,15 +101,22 @@ class _EventsPage extends StatelessWidget {
   }
 
   _EventItem _eventFromApi(AppEvent event) {
-    final minute = event.startsAt.minute.toString().padLeft(2, '0');
+    final images = _contentImages(event.imageUrls, event.imageUrl);
     return _EventItem(
-      imagePath: event.imageUrl ?? 'assets/images/coursel_image.png',
+      imagePath: images.first,
+      imagePaths: images,
       title: event.title,
-      organizer: 'TESCON',
-      dateLabel: '${event.startsAt.hour}:$minute',
+      organizer: event.organizer,
+      dateLabel: _timeLabel(event.startsAt),
+      timeRangeLabel: _timeRangeLabel(event.startsAt, event.endsAt),
+      fullDateLabel: _fullDateLabel(event.startsAt),
+      fullDateRangeLabel: _fullDateRangeLabel(event.startsAt, event.endsAt),
       location: event.venue,
       status: event.startsAt.isAfter(DateTime.now()) ? 'Upcoming' : 'Going On',
-      priceLabel: 'Free',
+      priceLabel: event.feeLabel,
+      fee: event.feeLabel,
+      venueNote: event.venueNote,
+      chatUrl: event.chatUrl,
       day: event.startsAt.day.toString().padLeft(2, '0'),
       month: _monthLabel(event.startsAt.month),
       details: event.description,
@@ -184,34 +140,96 @@ class _EventsPage extends StatelessWidget {
     ];
     return months[month - 1];
   }
+
+  String _timeRangeLabel(DateTime startsAt, DateTime? endsAt) {
+    if (endsAt == null) return _timeLabel(startsAt);
+    return '${_timeLabel(startsAt)} to ${_timeLabel(endsAt)}';
+  }
+
+  String _timeLabel(DateTime value) {
+    final period = value.hour >= 12 ? 'PM' : 'AM';
+    final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute $period';
+  }
+
+  String _fullDateLabel(DateTime value) {
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${weekdays[value.weekday - 1]}, ${months[value.month - 1]} ${value.day}';
+  }
+
+  String _fullDateRangeLabel(DateTime startsAt, DateTime? endsAt) {
+    if (endsAt == null) return 'Starts ${_fullDateLabel(startsAt)}';
+    final startsLabel = _fullDateLabel(startsAt);
+    final endsLabel = _fullDateLabel(endsAt);
+    return 'Starts $startsLabel\nEnds $endsLabel';
+  }
 }
 
 class _EventItem {
   const _EventItem({
     required this.imagePath,
+    this.imagePaths = const [],
     required this.title,
     required this.organizer,
     required this.dateLabel,
+    required this.timeRangeLabel,
+    required this.fullDateLabel,
+    required this.fullDateRangeLabel,
     required this.location,
     required this.status,
     required this.priceLabel,
     required this.day,
     required this.month,
     required this.details,
-    this.fee = 'Free',
+    this.venueNote,
+    this.chatUrl,
+    this.fee = '',
   });
 
   final String imagePath;
+  final List<String> imagePaths;
   final String title;
   final String organizer;
   final String dateLabel;
+  final String timeRangeLabel;
+  final String fullDateLabel;
+  final String fullDateRangeLabel;
   final String location;
   final String status;
   final String priceLabel;
   final String day;
   final String month;
   final String details;
+  final String? venueNote;
+  final String? chatUrl;
   final String fee;
+
+  bool get hasFee => fee.trim().isNotEmpty;
+  bool get hasOrganizer => organizer.trim().isNotEmpty;
+  bool get hasVenueNote => venueNote != null && venueNote!.trim().isNotEmpty;
 }
 
 class _EventSectionTitle extends StatelessWidget {
@@ -228,6 +246,26 @@ class _EventSectionTitle extends StatelessWidget {
         fontSize: 20,
         fontWeight: FontWeight.w800,
         letterSpacing: 0,
+      ),
+    );
+  }
+}
+
+class _EmptyEventGroup extends StatelessWidget {
+  const _EmptyEventGroup();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        'No events in this section yet',
+        textAlign: TextAlign.center,
+        style: GoogleFonts.inter(
+          color: const Color(0xFF777777),
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+        ),
       ),
     );
   }
@@ -258,15 +296,16 @@ class _CurrentEventCard extends StatelessWidget {
                     height: 98,
                     borderRadius: 14,
                   ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: _EventPill(
-                      label: event.priceLabel,
-                      backgroundColor: const Color(0xFFFFE66B),
-                      foregroundColor: Colors.black,
+                  if (event.hasFee)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: _EventPill(
+                        label: event.priceLabel,
+                        backgroundColor: const Color(0xFFFFE66B),
+                        foregroundColor: Colors.black,
+                      ),
                     ),
-                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -294,10 +333,12 @@ class _CurrentEventCard extends StatelessWidget {
                   letterSpacing: 0,
                 ),
               ),
-              const Spacer(),
-              _EventOrganizerRow(organizer: event.organizer),
-              const SizedBox(height: 6),
-              const _EventAvatarStack(),
+              if (event.hasOrganizer) ...[
+                const Spacer(),
+                _EventOrganizerRow(organizer: event.organizer),
+                const SizedBox(height: 6),
+              ] else
+                const Spacer(),
             ],
           ),
         ),
@@ -337,17 +378,18 @@ class _UpcomingEventCard extends StatelessWidget {
                           height: 118,
                           borderRadius: 14,
                         ),
-                        Positioned(
-                          top: 10,
-                          right: 10,
-                          child: _EventPill(
-                            label: event.priceLabel,
-                            backgroundColor: event.priceLabel == 'Paid'
-                                ? const Color(0xFFFF5D94)
-                                : const Color(0xFFFFE66B),
-                            foregroundColor: Colors.black,
+                        if (event.hasFee)
+                          Positioned(
+                            top: 10,
+                            right: 10,
+                            child: _EventPill(
+                              label: event.priceLabel,
+                              backgroundColor: event.priceLabel == 'Paid'
+                                  ? const Color(0xFFFF5D94)
+                                  : const Color(0xFFFFE66B),
+                              foregroundColor: Colors.black,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -375,10 +417,11 @@ class _UpcomingEventCard extends StatelessWidget {
                         letterSpacing: 0,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    _EventOrganizerRow(organizer: event.organizer),
+                    if (event.hasOrganizer) ...[
+                      const SizedBox(height: 10),
+                      _EventOrganizerRow(organizer: event.organizer),
+                    ],
                     const SizedBox(height: 8),
-                    const _EventAvatarStack(),
                   ],
                 ),
               ),
@@ -391,7 +434,7 @@ class _UpcomingEventCard extends StatelessWidget {
 }
 
 extension _EventItemMeta on _EventItem {
-  String get metaLine => '$dateLabel · $location';
+  String get metaLine => '$dateLabel - $location';
 }
 
 void _openEventDetails(BuildContext context, _EventItem event) {
@@ -437,37 +480,40 @@ class _EventDetailsPage extends StatelessWidget {
                       ),
                     ),
                   ),
-                  _CircleIconButton(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    onTap: () => _showDemoSheet(
-                      context,
-                      title: 'Event Chat',
-                      message: 'Event discussion opens here.',
-                    ),
-                  ),
+                  event.chatUrl == null || event.chatUrl!.trim().isEmpty
+                      ? const SizedBox(width: 36)
+                      : _CircleIconButton(
+                          icon: Icons.chat_bubble_outline_rounded,
+                          onTap: () => _showDemoSheet(
+                            context,
+                            title: 'Event Chat',
+                            message: event.chatUrl!,
+                          ),
+                        ),
                 ],
               ),
               const SizedBox(height: 22),
               Stack(
                 children: [
-                  _EventImage(
-                    imagePath: event.imagePath,
-                    height: 205,
-                    borderRadius: 18,
+                  _EventGallery(
+                    imagePaths: event.imagePaths.isEmpty
+                        ? [event.imagePath]
+                        : event.imagePaths,
                   ),
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: _EventPill(
-                      label: event.priceLabel == 'Paid'
-                          ? '\$ Paid'
-                          : event.priceLabel,
-                      backgroundColor: event.priceLabel == 'Paid'
-                          ? const Color(0xFFFF5D94)
-                          : const Color(0xFFFFE66B),
-                      foregroundColor: Colors.black,
+                  if (event.hasFee)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: _EventPill(
+                        label: event.priceLabel == 'Paid'
+                            ? '\$ Paid'
+                            : event.priceLabel,
+                        backgroundColor: event.priceLabel == 'Paid'
+                            ? const Color(0xFFFF5D94)
+                            : const Color(0xFFFFE66B),
+                        foregroundColor: Colors.black,
+                      ),
                     ),
-                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -481,7 +527,9 @@ class _EventDetailsPage extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${event.dateLabel} · ${event.location} · ${event.priceLabel} Event',
+                      event.hasFee
+                          ? '${event.timeRangeLabel} - ${event.location} - ${event.priceLabel} Event'
+                          : '${event.timeRangeLabel} - ${event.location}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
@@ -505,10 +553,10 @@ class _EventDetailsPage extends StatelessWidget {
                   letterSpacing: 0,
                 ),
               ),
-              const SizedBox(height: 14),
-              _EventOrganizerRow(organizer: event.organizer, fontSize: 15),
-              const SizedBox(height: 10),
-              const _EventAvatarStack(),
+              if (event.hasOrganizer) ...[
+                const SizedBox(height: 14),
+                _EventOrganizerRow(organizer: event.organizer, fontSize: 15),
+              ],
               const SizedBox(height: 22),
               _EventInfoPanel(event: event),
               const SizedBox(height: 18),
@@ -561,23 +609,25 @@ class _EventInfoPanel extends StatelessWidget {
       borderRadius: 18,
       child: Column(
         children: [
-          _EventInfoRow(
-            icon: Icons.wallet_rounded,
-            title: 'Event Fee',
-            subtitle: event.fee,
-          ),
-          const SizedBox(height: 16),
+          if (event.hasFee) ...[
+            _EventInfoRow(
+              icon: Icons.wallet_rounded,
+              title: 'Event Fee',
+              subtitle: event.fee,
+            ),
+            const SizedBox(height: 16),
+          ],
           _EventInfoRow(
             dateMonth: event.month,
             dateDay: event.day,
-            title: 'Sunday, October 19',
-            subtitle: '${event.dateLabel} to 9:00 PM GMT',
+            title: event.fullDateRangeLabel,
+            subtitle: event.timeRangeLabel,
           ),
           const SizedBox(height: 16),
           _EventInfoRow(
             icon: Icons.location_on_outlined,
             title: event.location,
-            subtitle: 'TESCON chapter event venue',
+            subtitle: event.hasVenueNote ? event.venueNote!.trim() : null,
           ),
         ],
       ),
@@ -588,14 +638,14 @@ class _EventInfoPanel extends StatelessWidget {
 class _EventInfoRow extends StatelessWidget {
   const _EventInfoRow({
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     this.icon,
     this.dateMonth,
     this.dateDay,
   });
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final IconData? icon;
   final String? dateMonth;
   final String? dateDay;
@@ -622,16 +672,18 @@ class _EventInfoRow extends StatelessWidget {
                   letterSpacing: 0,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: GoogleFonts.inter(
-                  color: const Color(0xFF666666),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0,
+              if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  subtitle!,
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF666666),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -673,15 +725,18 @@ class _EventImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resolvedPath = ApiConfig.mediaUrl(imagePath);
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
-      child: imagePath.startsWith('http')
-          ? Image.network(
-              imagePath,
+      child: imagePath.startsWith('http') || imagePath.startsWith('/')
+          ? CachedNetworkImage(
+              imageUrl: resolvedPath,
               width: double.infinity,
               height: height,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => _eventImageFallback(height),
+              placeholder: (_, _) =>
+                  _ShimmerBlock(height: height, borderRadius: 0),
+              errorWidget: (_, _, _) => _eventImageFallback(height),
             )
           : Image.asset(
               imagePath,
@@ -698,6 +753,51 @@ class _EventImage extends StatelessWidget {
       height: height,
       color: const Color(0xFFE7EAF6),
       child: const Icon(Icons.event_busy_outlined),
+    );
+  }
+}
+
+class _EventGallery extends StatefulWidget {
+  const _EventGallery({required this.imagePaths});
+
+  final List<String> imagePaths;
+
+  @override
+  State<_EventGallery> createState() => _EventGalleryState();
+}
+
+class _EventGalleryState extends State<_EventGallery> {
+  int activeIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: SizedBox(
+            height: 205,
+            child: PageView.builder(
+              itemCount: widget.imagePaths.length,
+              onPageChanged: (index) => setState(() => activeIndex = index),
+              itemBuilder: (context, index) {
+                return _EventImage(
+                  imagePath: widget.imagePaths[index],
+                  height: 205,
+                  borderRadius: 0,
+                );
+              },
+            ),
+          ),
+        ),
+        if (widget.imagePaths.length > 1) ...[
+          const SizedBox(height: 10),
+          _GalleryDots(
+            count: widget.imagePaths.length,
+            activeIndex: activeIndex,
+          ),
+        ],
+      ],
     );
   }
 }
@@ -756,10 +856,7 @@ class _EventMetaText extends StatelessWidget {
 }
 
 class _EventOrganizerRow extends StatelessWidget {
-  const _EventOrganizerRow({
-    required this.organizer,
-    this.fontSize = 12,
-  });
+  const _EventOrganizerRow({required this.organizer, this.fontSize = 12});
 
   final String organizer;
   final double fontSize;
@@ -798,44 +895,6 @@ class _EventOrganizerRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _EventAvatarStack extends StatelessWidget {
-  const _EventAvatarStack();
-
-  @override
-  Widget build(BuildContext context) {
-    const avatars = [
-      'assets/images/man.png',
-      'assets/images/suit.png',
-      'assets/images/white.png',
-      'assets/images/yellow.png',
-    ];
-
-    return SizedBox(
-      height: 26,
-      width: 86,
-      child: Stack(
-        children: [
-          for (var index = 0; index < avatars.length; index++)
-            Positioned(
-              left: index * 17,
-              child: Container(
-                padding: const EdgeInsets.all(1.5),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: CircleAvatar(
-                  radius: 11,
-                  backgroundImage: AssetImage(avatars[index]),
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -902,4 +961,3 @@ class _EventDateTile extends StatelessWidget {
     );
   }
 }
-

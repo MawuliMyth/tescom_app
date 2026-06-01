@@ -44,18 +44,14 @@ class _DemoDrawer extends StatelessWidget {
                         _DrawerTile(
                           icon: Icons.article_outlined,
                           title: 'Latest News',
-                          onTap: () => _openDrawerPage(
-                            context,
-                            const _LatestNewsPage(),
-                          ),
+                          onTap: () =>
+                              _openDrawerPage(context, const _LatestNewsPage()),
                         ),
                         _DrawerTile(
                           icon: Icons.event_outlined,
                           title: 'Events',
-                          onTap: () => _openDrawerPage(
-                            context,
-                            const _EventsPage(),
-                          ),
+                          onTap: () =>
+                              _openDrawerPage(context, const _EventsPage()),
                         ),
                         _DrawerTile(
                           icon: Icons.campaign_outlined,
@@ -74,10 +70,8 @@ class _DemoDrawer extends StatelessWidget {
                         _DrawerTile(
                           icon: Icons.history_edu_outlined,
                           title: 'TESCON History',
-                          onTap: () => _openDrawerPage(
-                            context,
-                            const _HistoryPage(),
-                          ),
+                          onTap: () =>
+                              _openDrawerPage(context, const _HistoryPage()),
                         ),
                         _DrawerTile(
                           icon: Icons.badge_outlined,
@@ -90,18 +84,14 @@ class _DemoDrawer extends StatelessWidget {
                         _DrawerTile(
                           icon: Icons.groups_outlined,
                           title: 'Executives',
-                          onTap: () => _openDrawerPage(
-                            context,
-                            const _ExecutivesPage(),
-                          ),
+                          onTap: () =>
+                              _openDrawerPage(context, const _ExecutivesPage()),
                         ),
                         _DrawerTile(
                           icon: Icons.school_outlined,
                           title: 'Campus Chapters',
-                          onTap: () => _openDrawerPage(
-                            context,
-                            const _ChaptersPage(),
-                          ),
+                          onTap: () =>
+                              _openDrawerPage(context, const _ChaptersPage()),
                         ),
                       ],
                     ),
@@ -112,26 +102,20 @@ class _DemoDrawer extends StatelessWidget {
                         _DrawerTile(
                           icon: Icons.work_outline_rounded,
                           title: 'Jobs & Opportunities',
-                          onTap: () => _openDrawerPage(
-                            context,
-                            const _JobsPage(),
-                          ),
+                          onTap: () =>
+                              _openDrawerPage(context, const _JobsPage()),
                         ),
                         _DrawerTile(
                           icon: Icons.chat_bubble_outline_rounded,
                           title: 'Live Chat',
-                          onTap: () => _openDrawerPage(
-                            context,
-                            const _LiveChatPage(),
-                          ),
+                          onTap: () =>
+                              _openDrawerPage(context, const _LiveChatPage()),
                         ),
                         _DrawerTile(
                           icon: Icons.poll_outlined,
                           title: 'Polls & Surveys',
-                          onTap: () => _openDrawerPage(
-                            context,
-                            const _PollsPage(),
-                          ),
+                          onTap: () =>
+                              _openDrawerPage(context, const _PollsPage()),
                         ),
                       ],
                     ),
@@ -148,17 +132,15 @@ class _DemoDrawer extends StatelessWidget {
 
 void _openDrawerPage(BuildContext context, Widget page) {
   final navigator = Navigator.of(context);
+  final route = _adaptivePageRoute(context, builder: (_) => page);
   navigator.pop();
   Future<void>.delayed(const Duration(milliseconds: 180), () {
-    navigator.push(_adaptivePageRoute(context, builder: (_) => page));
+    navigator.push(route);
   });
 }
 
 class _DrawerSection extends StatelessWidget {
-  const _DrawerSection({
-    required this.title,
-    required this.children,
-  });
+  const _DrawerSection({required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -219,9 +201,7 @@ class _DrawerTile extends StatelessWidget {
     return ListTile(
       minLeadingWidth: 24,
       contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       leading: Icon(icon, color: const Color(0xFF34368C), size: 22),
       title: Text(
         title,

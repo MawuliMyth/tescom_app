@@ -12,13 +12,6 @@ class _PollsPageState extends State<_PollsPage> {
   String selectedTab = 'Polls';
   String? selectedOption;
 
-  final pollOptions = const [
-    _PollOption(label: 'Jobs & internships', percent: 47),
-    _PollOption(label: 'Leadership workshops', percent: 34),
-    _PollOption(label: 'Campus events', percent: 13),
-    _PollOption(label: 'Community outreach', percent: 6),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -29,26 +22,47 @@ class _PollsPageState extends State<_PollsPage> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
             children: [
-              _PollsHeader(
-                onBack: () => Navigator.pop(context),
-              ),
+              _PollsHeader(onBack: () => Navigator.pop(context)),
               const SizedBox(height: 14),
               _PollTabs(
                 selectedTab: selectedTab,
                 onSelected: (value) => setState(() => selectedTab = value),
               ),
               const SizedBox(height: 18),
-              const _SurveyScoreCard(),
-              const SizedBox(height: 18),
-              const _ActivityQueue(),
-              const SizedBox(height: 18),
-              _PollActivityCard(
-                options: pollOptions,
-                selectedOption: selectedOption,
-                onSelected: (value) => setState(() => selectedOption = value),
+              FutureBuilder<AppBootstrap>(
+                future: AppRepository().loadBootstrap(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const _ListShimmer(itemCount: 2);
+                  }
+                  if (snapshot.hasError) return const _InlineErrorState();
+
+                  final polls = snapshot.data?.polls ?? const [];
+                  if (polls.isEmpty) {
+                    return const _InfoCard(
+                      item: _InfoItem(
+                        title: 'No polls yet',
+                        subtitle: 'Admin dashboard',
+                        body: 'Published polls will appear here.',
+                        icon: Icons.poll_outlined,
+                      ),
+                    );
+                  }
+
+                  final poll = polls.first;
+                  return _PollActivityCard(
+                    poll: poll,
+                    selectedOption: selectedOption,
+                    onSelected: (value) async {
+                      setState(() => selectedOption = value);
+                      await AppRepository().voteInPoll(
+                        pollId: poll.id,
+                        optionId: value,
+                      );
+                    },
+                  );
+                },
               ),
-              const SizedBox(height: 18),
-              const _QuickSurveyCard(),
             ],
           ),
         ),
@@ -59,19 +73,19 @@ class _PollsPageState extends State<_PollsPage> {
 
 class _PollOption {
   const _PollOption({
+    required this.id,
     required this.label,
     required this.percent,
   });
 
+  final String id;
   final String label;
   final int percent;
 }
 
 // Top bar for the polls area.
 class _PollsHeader extends StatelessWidget {
-  const _PollsHeader({
-    required this.onBack,
-  });
+  const _PollsHeader({required this.onBack});
 
   final VoidCallback onBack;
 
@@ -107,10 +121,7 @@ class _PollsHeader extends StatelessWidget {
 
 // Category chips inspired by the poll reference UI.
 class _PollTabs extends StatelessWidget {
-  const _PollTabs({
-    required this.selectedTab,
-    required this.onSelected,
-  });
+  const _PollTabs({required this.selectedTab, required this.onSelected});
 
   final String selectedTab;
   final ValueChanged<String> onSelected;
@@ -148,6 +159,7 @@ class _PollTabs extends StatelessWidget {
 }
 
 // Compact survey status card with a circular score visual.
+// ignore: unused_element
 class _SurveyScoreCard extends StatelessWidget {
   const _SurveyScoreCard();
 
@@ -198,26 +210,26 @@ class _SurveyScoreCard extends StatelessWidget {
           SizedBox(
             width: 74,
             height: 74,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: 0.7,
-                  strokeWidth: 7,
-                  backgroundColor: const Color(0xFFE8E8EF),
-                  color: const Color(0xFF34368C),
-                  strokeCap: StrokeCap.round,
+            child: Shimmer.fromColors(
+              baseColor: const Color(0xFFE8ECF4),
+              highlightColor: const Color(0xFFF8FAFF),
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFE8E8EF), width: 7),
+                  shape: BoxShape.circle,
                 ),
-                Text(
+                child: Text(
                   '70%',
                   style: GoogleFonts.inter(
-                    color: Colors.black,
+                    color: const Color(0xFF34368C),
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0,
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -229,12 +241,12 @@ class _SurveyScoreCard extends StatelessWidget {
 // Main poll card with progress bars and vote feedback.
 class _PollActivityCard extends StatelessWidget {
   const _PollActivityCard({
-    required this.options,
+    required this.poll,
     required this.selectedOption,
     required this.onSelected,
   });
 
-  final List<_PollOption> options;
+  final AppPoll poll;
   final String? selectedOption;
   final ValueChanged<String> onSelected;
 
@@ -251,7 +263,7 @@ class _PollActivityCard extends StatelessWidget {
             children: [
               const CircleAvatar(
                 radius: 18,
-                backgroundImage: AssetImage('assets/images/suit.png'),
+                backgroundImage: AssetImage('assets/images/logo.png'),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -259,7 +271,7 @@ class _PollActivityCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Chris Lloyd',
+                      'TESCON',
                       style: GoogleFonts.inter(
                         color: Colors.black,
                         fontSize: 13,
@@ -268,7 +280,7 @@ class _PollActivityCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '21 minutes ago',
+                      _friendlyDate(poll.closesAt),
                       style: GoogleFonts.inter(
                         color: const Color(0xFF888888),
                         fontSize: 10,
@@ -284,7 +296,7 @@ class _PollActivityCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Which opportunity should TESCON prioritize this semester?',
+            poll.question,
             style: GoogleFonts.inter(
               color: Colors.black,
               fontSize: 16,
@@ -295,7 +307,7 @@ class _PollActivityCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '45 votes · Vote to see results',
+            poll.description ?? 'Vote to submit your response',
             style: GoogleFonts.inter(
               color: const Color(0xFF777777),
               fontSize: 11,
@@ -304,20 +316,21 @@ class _PollActivityCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          ...options.map(
-            (option) {
-              final isSelected = selectedOption == option.label;
-              final value = isSelected
-                  ? (option.percent + 5).clamp(0, 100)
-                  : option.percent;
-              return _PollOptionBar(
-                option: option.label,
-                percent: value,
-                selected: isSelected,
-                onTap: () => onSelected(option.label),
-              );
-            },
-          ),
+          ...poll.options.map((option) {
+            final pollOption = _PollOption(
+              id: option.id,
+              label: option.text,
+              percent: option.voteCount,
+            );
+            final isSelected = selectedOption == option.id;
+            final value = isSelected ? 100 : pollOption.percent;
+            return _PollOptionBar(
+              option: pollOption.label,
+              percent: value,
+              selected: isSelected,
+              onTap: () => onSelected(option.id),
+            );
+          }),
           const Divider(height: 26, color: Color(0xFFE8E8EF)),
           Row(
             children: [
@@ -532,22 +545,28 @@ class _QuickSurveyCardState extends State<_QuickSurveyCard> {
           const SizedBox(height: 8),
           _SurveyQuestion(
             title: 'Which platform do you use daily?',
-            child: Column(
-              children: ['WhatsApp', 'Instagram', 'Facebook', 'X'].map((item) {
-                return RadioListTile<String>(
-                  value: item,
-                  groupValue: dailyApp,
-                  onChanged: (value) => setState(() => dailyApp = value!),
-                  activeColor: const Color(0xFF34368C),
-                  dense: true,
-                  visualDensity: VisualDensity.compact,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    item,
-                    style: GoogleFonts.inter(fontSize: 12, letterSpacing: 0),
-                  ),
-                );
-              }).toList(),
+            child: RadioGroup<String>(
+              groupValue: dailyApp,
+              onChanged: (value) {
+                if (value != null) setState(() => dailyApp = value);
+              },
+              child: Column(
+                children: ['WhatsApp', 'Instagram', 'Facebook', 'X'].map((
+                  item,
+                ) {
+                  return RadioListTile<String>(
+                    value: item,
+                    activeColor: const Color(0xFF34368C),
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      item,
+                      style: GoogleFonts.inter(fontSize: 12, letterSpacing: 0),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
           ),
         ],
@@ -557,6 +576,7 @@ class _QuickSurveyCardState extends State<_QuickSurveyCard> {
 }
 
 // Modern status card showing activities waiting for response.
+// ignore: unused_element
 class _ActivityQueue extends StatelessWidget {
   const _ActivityQueue();
 
@@ -636,10 +656,7 @@ class _ActivityQueue extends StatelessWidget {
 }
 
 class _ActivityQueueStat extends StatelessWidget {
-  const _ActivityQueueStat({
-    required this.value,
-    required this.label,
-  });
+  const _ActivityQueueStat({required this.value, required this.label});
 
   final String value;
   final String label;
@@ -681,10 +698,7 @@ class _ActivityQueueStat extends StatelessWidget {
 }
 
 class _SurveyQuestion extends StatelessWidget {
-  const _SurveyQuestion({
-    required this.title,
-    required this.child,
-  });
+  const _SurveyQuestion({required this.title, required this.child});
 
   final String title;
   final Widget child;

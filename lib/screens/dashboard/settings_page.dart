@@ -91,11 +91,13 @@ class _SettingsPageState extends State<_SettingsPage> {
                     icon: Icons.logout_rounded,
                     title: 'Logout',
                     destructive: true,
-                    onTap: () => _showDemoSheet(
-                      context,
-                      title: 'Logout',
-                      message: 'Logout confirmation can be connected here.',
-                    ),
+                    onTap: () async {
+                      await AuthService().logout();
+                      if (!context.mounted) return;
+                      Navigator.of(
+                        context,
+                      ).pushNamedAndRemoveUntil('signin_screen', (_) => false);
+                    },
                   ),
                 ],
               ),
@@ -109,10 +111,7 @@ class _SettingsPageState extends State<_SettingsPage> {
 
 // Top settings app bar with centered title.
 class _SettingsHeader extends StatelessWidget {
-  const _SettingsHeader({
-    required this.showBackButton,
-    required this.onBack,
-  });
+  const _SettingsHeader({required this.showBackButton, required this.onBack});
 
   final bool showBackButton;
   final VoidCallback onBack;
@@ -149,79 +148,71 @@ class _SettingsProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const CircleAvatar(
-          radius: 28,
-          backgroundImage: AssetImage('assets/images/suit.png'),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Chris Lloyd Nii Kwesi',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                'member@tescon.app',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0,
-                ),
-              ),
-              const SizedBox(height: 8),
-              FilledButton(
-                onPressed: () => _showDemoSheet(
-                  context,
-                  title: 'Edit profile',
-                  message: 'Profile editing can be connected here.',
-                ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF34368C),
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(0, 30),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+    return FutureBuilder<AppUser?>(
+      future: AppRepository().loadCurrentUser(),
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+        return Row(
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundImage: user?.avatarUrl == null
+                  ? const AssetImage('assets/images/logo.png')
+                  : _memberImageProvider(user!.avatarUrl!),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user?.fullName ?? 'TESCON Member',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0,
+                    ),
                   ),
-                ),
-                child: Text(
-                  'Edit profile',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0,
+                  const SizedBox(height: 3),
+                  Text(
+                    user?.email ?? 'No email available',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0,
+                    ),
                   ),
-                ),
+                  if (user?.organizationRole != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      user!.organizationRole!,
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF34368C),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
 // A titled group of settings rows.
 class _SettingsSection extends StatelessWidget {
-  const _SettingsSection({
-    required this.title,
-    required this.children,
-  });
+  const _SettingsSection({required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -273,7 +264,9 @@ class _SettingsBaseRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = destructive ? const Color(0xFFE54848) : const Color(0xFF34368C);
+    final color = destructive
+        ? const Color(0xFFE54848)
+        : const Color(0xFF34368C);
     final iconBackground = destructive
         ? (isDark ? const Color(0xFF3A1F24) : const Color(0xFFFFE9E9))
         : (isDark ? const Color(0xFF292A46) : const Color(0xFFEFEFFC));
@@ -336,7 +329,7 @@ class _SettingsToggleRow extends StatelessWidget {
       title: title,
       trailing: Switch.adaptive(
         value: value,
-        activeColor: const Color(0xFF34368C),
+        activeThumbColor: const Color(0xFF34368C),
         onChanged: onChanged,
       ),
     );
@@ -382,7 +375,9 @@ class _SettingsValueRow extends StatelessWidget {
           const SizedBox(width: 4),
           Icon(
             Icons.chevron_right_rounded,
-            color: destructive ? const Color(0xFFE54848) : const Color(0xFF999999),
+            color: destructive
+                ? const Color(0xFFE54848)
+                : const Color(0xFF999999),
             size: 20,
           ),
         ],

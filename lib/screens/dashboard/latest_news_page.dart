@@ -16,19 +16,26 @@ class _LatestNewsPage extends StatelessWidget {
           future: AppRepository().loadBootstrap(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const _ListShimmer(itemCount: 3);
             }
+            if (snapshot.hasError) return const _InlineErrorState();
 
             final articles = snapshot.data?.news ?? const [];
-            if (articles.isEmpty) return const _RecommendationList();
+            if (articles.isEmpty) {
+              return const _InfoCard(
+                item: _InfoItem(
+                  title: 'No news yet',
+                  subtitle: 'Admin dashboard',
+                  body: 'Published news stories will appear here.',
+                  icon: Icons.article_outlined,
+                ),
+              );
+            }
 
-            return Column(
-              children: articles.map(_ApiNewsTile.new).toList(),
-            );
+            return Column(children: articles.map(_ApiNewsTile.new).toList());
           },
         ),
       ],
     );
   }
 }
-

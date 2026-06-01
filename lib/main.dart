@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:tescon_app/core/auth_service.dart';
 import 'package:tescon_app/screens/dashboard_screen.dart';
 import 'package:tescon_app/screens/onboarding_screen.dart';
@@ -50,15 +51,58 @@ class _AuthGate extends StatelessWidget {
       future: AuthService().hasSession(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: _AuthGateShimmer());
         }
 
         return snapshot.data!
             ? const DashboardScreen()
             : const OnboardingScreen();
       },
+    );
+  }
+}
+
+class _AuthGateShimmer extends StatelessWidget {
+  const _AuthGateShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Shimmer.fromColors(
+        baseColor: const Color(0xFFE8ECF4),
+        highlightColor: const Color(0xFFF8FAFF),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 86,
+              height: 86,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              width: 180,
+              height: 16,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: 124,
+              height: 12,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
