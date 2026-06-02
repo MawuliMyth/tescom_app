@@ -30,7 +30,6 @@ class _AppSurface extends StatelessWidget {
     required this.child,
     this.width,
     this.height,
-    this.constraints,
     this.padding,
     this.margin,
     this.borderRadius = 18,
@@ -40,7 +39,6 @@ class _AppSurface extends StatelessWidget {
   final Widget child;
   final double? width;
   final double? height;
-  final BoxConstraints? constraints;
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
   final double borderRadius;
@@ -59,7 +57,6 @@ class _AppSurface extends StatelessWidget {
     return Container(
       width: width,
       height: height,
-      constraints: constraints,
       margin: margin,
       padding: padding,
       alignment: Alignment.center,
