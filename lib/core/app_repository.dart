@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'api_client.dart';
 import 'app_models.dart';
 
@@ -54,6 +56,19 @@ class AppRepository {
     return _list(data['conversations'], AppConversation.fromJson);
   }
 
+  Future<AppConversation> createConversation({
+    required String title,
+    List<String> participantIds = const [],
+  }) async {
+    final data = await _apiClient.post(
+      '/api/app/conversations',
+      body: {'title': title, 'participantIds': participantIds},
+    );
+    return AppConversation.fromJson(
+      data['conversation'] as Map<String, dynamic>,
+    );
+  }
+
   Future<List<AppMessage>> loadConversationMessages(
     String conversationId,
   ) async {
@@ -66,12 +81,59 @@ class AppRepository {
   Future<AppMessage> sendConversationMessage({
     required String conversationId,
     required String body,
+    String? mediaUrl,
+    String? mediaType,
   }) async {
+    final payload = <String, dynamic>{'body': body};
+    if (mediaUrl != null) payload['mediaUrl'] = mediaUrl;
+    if (mediaType != null) payload['mediaType'] = mediaType;
     final data = await _apiClient.post(
       '/api/app/conversations/$conversationId/messages',
-      body: {'body': body},
+      body: payload,
     );
     return AppMessage.fromJson(data['message'] as Map<String, dynamic>);
+  }
+
+  Future<({String url, String contentType})> uploadChatMedia({
+    required String filename,
+    required List<int> bytes,
+    required String contentType,
+  }) async {
+    final data = await _apiClient.uploadFile(
+      '/api/app/uploads',
+      fieldName: 'file',
+      filename: filename,
+      bytes: Uint8List.fromList(bytes),
+      contentType: contentType,
+    );
+    return (
+      url: data['url'] as String? ?? '',
+      contentType: data['contentType'] as String? ?? contentType,
+    );
+  }
+
+  Future<void> applyForJob({
+    required String jobId,
+    String? fullName,
+    String? email,
+    String? phone,
+    String? institution,
+    String? coverNote,
+    String? credentialsUrl,
+    String? supportingUrl,
+  }) async {
+    await _apiClient.post(
+      '/api/app/jobs/$jobId/apply',
+      body: {
+        if (_hasValue(fullName)) 'fullName': fullName!.trim(),
+        if (_hasValue(email)) 'email': email!.trim(),
+        if (_hasValue(phone)) 'phone': phone!.trim(),
+        if (_hasValue(institution)) 'institution': institution!.trim(),
+        if (_hasValue(coverNote)) 'coverNote': coverNote!.trim(),
+        if (_hasValue(credentialsUrl)) 'credentialsUrl': credentialsUrl!.trim(),
+        if (_hasValue(supportingUrl)) 'supportingUrl': supportingUrl!.trim(),
+      },
+    );
   }
 
   Future<List<AppSavedItem>> loadSavedItems() async {
@@ -106,6 +168,8 @@ class AppRepository {
     );
   }
 }
+
+bool _hasValue(String? value) => value != null && value.trim().isNotEmpty;
 
 List<T> _list<T>(Object? value, T Function(Map<String, dynamic>) fromJson) {
   if (value is! List) return const [];

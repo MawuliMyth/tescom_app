@@ -28,6 +28,7 @@ const db = prisma as any;
 const corsOrigins = env.CORS_ORIGIN?.split(",").map((origin) => origin.trim()).filter(Boolean);
 const uploadDir = path.resolve("storage/uploads");
 const imageMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const mediaMimeTypes = new Set([...imageMimeTypes, "video/mp4", "video/webm", "video/quicktime"]);
 const useBlobStorage = Boolean(env.BLOB_READ_WRITE_TOKEN);
 
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -42,9 +43,9 @@ const upload = multer({
           callback(null, `${crypto.randomUUID()}${extension}`);
         }
       }),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 25 * 1024 * 1024 },
   fileFilter: (_req, file, callback) => {
-    callback(null, imageMimeTypes.has(file.mimetype));
+    callback(null, mediaMimeTypes.has(file.mimetype));
   }
 });
 
@@ -607,6 +608,29 @@ app.get("/api/app/conversations", requireAuth, asyncHandler(async (req, res) => 
   res.json({ conversations });
 }));
 
+app.post("/api/app/conversations", requireAuth, asyncHandler(async (req, res) => {
+  const body = z.object({
+    title: z.string().min(2),
+    participantIds: z.array(z.string().min(1)).max(50).default([])
+  }).parse(req.body);
+  const participantIds = Array.from(new Set([req.user!.id, ...body.participantIds]));
+  const conversation = await db.conversation.create({
+    data: {
+      title: body.title,
+      isGroup: true,
+      creatorId: req.user!.id,
+      participants: {
+        create: participantIds.map((userId) => ({
+          userId,
+          role: userId === req.user!.id ? "OWNER" : "MEMBER"
+        }))
+      }
+    },
+    include: publicConversationInclude
+  });
+  res.status(201).json({ conversation });
+}));
+
 app.get("/api/app/conversations/:id/messages", requireAuth, asyncHandler(async (req, res) => {
   const id = String(req.params.id);
   const conversation = await db.conversation.findFirst({
@@ -730,6 +754,40 @@ app.post("/api/app/jobs/:id/apply", requireAuth, asyncHandler(async (req, res) =
   });
   res.status(201).json({ application });
 }));
+
+app.post(
+  "/api/app/uploads",
+  requireAuth,
+  upload.single("file"),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: "Media file is required" });
+    }
+
+    if (useBlobStorage) {
+      const extension = path.extname(req.file.originalname).toLowerCase();
+      const filename = `uploads/${crypto.randomUUID()}${extension}`;
+      const blob = await put(filename, req.file.buffer, {
+        access: "public",
+        contentType: req.file.mimetype
+      });
+
+      return res.status(201).json({
+        url: blob.url,
+        filename,
+        contentType: req.file.mimetype,
+        size: req.file.size
+      });
+    }
+
+    return res.status(201).json({
+      url: `/uploads/${req.file.filename}`,
+      filename: req.file.filename,
+      contentType: req.file.mimetype,
+      size: req.file.size
+    });
+  })
+);
 
 app.get("/api/app/saved-items", requireAuth, asyncHandler(async (req, res) => {
   const savedItems = await prisma.savedItem.findMany({

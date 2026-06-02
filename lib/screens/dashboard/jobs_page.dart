@@ -112,6 +112,7 @@ class _JobsPageState extends State<_JobsPage> {
         .map((word) => word[0].toUpperCase())
         .join();
     return _Job(
+      id: job.id,
       title: job.title,
       organization: job.company,
       initials: words.isEmpty ? 'TS' : words,
@@ -126,6 +127,7 @@ class _JobsPageState extends State<_JobsPage> {
           ? 'Open'
           : '${job.deadline!.day}/${job.deadline!.month}/${job.deadline!.year}',
       description: job.description,
+      applyUrl: job.applyUrl,
       requirements: const [
         'Review the full opportunity details',
         'Prepare the requested documents',
@@ -137,6 +139,7 @@ class _JobsPageState extends State<_JobsPage> {
 
 class _Job {
   const _Job({
+    required this.id,
     required this.title,
     required this.organization,
     required this.initials,
@@ -149,9 +152,11 @@ class _Job {
     required this.status,
     required this.deadline,
     required this.description,
+    this.applyUrl,
     required this.requirements,
   });
 
+  final String id;
   final String title;
   final String organization;
   final String initials;
@@ -164,6 +169,7 @@ class _Job {
   final String status;
   final String deadline;
   final String description;
+  final String? applyUrl;
   final List<String> requirements;
 
   bool matches(String query) {
@@ -404,6 +410,44 @@ class _JobDetailPage extends StatefulWidget {
 class _JobDetailPageState extends State<_JobDetailPage> {
   bool applied = false;
   bool saved = false;
+  bool applying = false;
+
+  Future<void> apply() async {
+    if (applying || applied) return;
+    final result = await showModalBottomSheet<_JobApplicationDraft>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _JobApplicationSheet(job: widget.job),
+    );
+    if (result == null) return;
+
+    setState(() => applying = true);
+    try {
+      await AppRepository().applyForJob(
+        jobId: widget.job.id,
+        fullName: result.fullName,
+        email: result.email,
+        phone: result.phone,
+        institution: result.institution,
+        coverNote: result.coverNote,
+        credentialsUrl: result.credentialsUrl,
+        supportingUrl: result.supportingUrl,
+      );
+      if (!mounted) return;
+      setState(() => applied = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Application submitted successfully.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlyError(error))),
+      );
+    } finally {
+      if (mounted) setState(() => applying = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -462,7 +506,7 @@ class _JobDetailPageState extends State<_JobDetailPage> {
               child: FilledButton(
                 onPressed: applied
                     ? null
-                    : () => setState(() => applied = true),
+                    : apply,
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF34368C),
                   foregroundColor: Colors.white,
@@ -473,7 +517,7 @@ class _JobDetailPageState extends State<_JobDetailPage> {
                   ),
                 ),
                 child: Text(
-                  applied ? 'APPLIED' : 'APPLY NOW',
+                  applying ? 'SUBMITTING...' : applied ? 'APPLIED' : 'APPLY NOW',
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
@@ -539,6 +583,278 @@ class _JobDetailHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+class _JobApplicationDraft {
+  const _JobApplicationDraft({
+    required this.fullName,
+    required this.email,
+    this.phone,
+    this.institution,
+    this.coverNote,
+    this.credentialsUrl,
+    this.supportingUrl,
+  });
+
+  final String fullName;
+  final String email;
+  final String? phone;
+  final String? institution;
+  final String? coverNote;
+  final String? credentialsUrl;
+  final String? supportingUrl;
+}
+
+class _JobApplicationSheet extends StatefulWidget {
+  const _JobApplicationSheet({required this.job});
+
+  final _Job job;
+
+  @override
+  State<_JobApplicationSheet> createState() => _JobApplicationSheetState();
+}
+
+class _JobApplicationSheetState extends State<_JobApplicationSheet> {
+  final formKey = GlobalKey<FormState>();
+  final fullNameController = TextEditingController();
+  final emailController = TextEditingController();
+  final phoneController = TextEditingController();
+  final institutionController = TextEditingController();
+  final coverController = TextEditingController();
+  final credentialsController = TextEditingController();
+  final supportingController = TextEditingController();
+  late Future<AppUser?> userFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    userFuture = AppRepository().loadCurrentUser();
+    userFuture.then((user) {
+      if (!mounted || user == null) return;
+      fullNameController.text = user.fullName;
+      emailController.text = user.email;
+      phoneController.text = user.phone ?? '';
+      institutionController.text = user.institution ?? '';
+    }).catchError((_) {});
+  }
+
+  @override
+  void dispose() {
+    fullNameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    institutionController.dispose();
+    coverController.dispose();
+    credentialsController.dispose();
+    supportingController.dispose();
+    super.dispose();
+  }
+
+  void submit() {
+    if (!(formKey.currentState?.validate() ?? false)) return;
+    Navigator.pop(
+      context,
+      _JobApplicationDraft(
+        fullName: fullNameController.text.trim(),
+        email: emailController.text.trim(),
+        phone: phoneController.text.trim(),
+        institution: institutionController.text.trim(),
+        coverNote: coverController.text.trim(),
+        credentialsUrl: credentialsController.text.trim(),
+        supportingUrl: supportingController.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE2E5F1),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Apply for ${widget.job.title}',
+                      style: GoogleFonts.inter(
+                        color: Colors.black,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      widget.job.organization,
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF777777),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _ApplicationField(
+                      controller: fullNameController,
+                      label: 'Full name',
+                      validator: _requiredField,
+                    ),
+                    _ApplicationField(
+                      controller: emailController,
+                      label: 'Email',
+                      keyboardType: TextInputType.emailAddress,
+                      validator: _emailValidator,
+                    ),
+                    _ApplicationField(
+                      controller: phoneController,
+                      label: 'Phone',
+                      keyboardType: TextInputType.phone,
+                    ),
+                    _ApplicationField(
+                      controller: institutionController,
+                      label: 'Institution',
+                    ),
+                    _ApplicationField(
+                      controller: coverController,
+                      label: 'Cover note',
+                      maxLines: 4,
+                    ),
+                    _ApplicationField(
+                      controller: credentialsController,
+                      label: 'Credentials link',
+                      keyboardType: TextInputType.url,
+                      validator: _optionalUrlValidator,
+                    ),
+                    _ApplicationField(
+                      controller: supportingController,
+                      label: 'Supporting document link',
+                      keyboardType: TextInputType.url,
+                      validator: _optionalUrlValidator,
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton(
+                      onPressed: submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF34368C),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: const Text('Submit application'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ApplicationField extends StatelessWidget {
+  const _ApplicationField({
+    required this.controller,
+    required this.label,
+    this.keyboardType,
+    this.validator,
+    this.maxLines = 1,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        validator: validator,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: const Color(0xFFF7F8FC),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: Color(0xFF34368C)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String? _requiredField(String? value) {
+  return value == null || value.trim().length < 2 ? 'Enter this field' : null;
+}
+
+String? _emailValidator(String? value) {
+  final text = value?.trim() ?? '';
+  final valid = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(text);
+  return valid ? null : 'Enter a valid email address';
+}
+
+String? _optionalUrlValidator(String? value) {
+  final text = value?.trim() ?? '';
+  if (text.isEmpty) return null;
+  final uri = Uri.tryParse(text);
+  return uri != null && uri.hasScheme && uri.host.isNotEmpty
+      ? null
+      : 'Enter a valid link';
+}
+
+String _friendlyError(Object error) {
+  final message = error.toString().replaceFirst('Exception: ', '');
+  if (message.contains('Authentication') ||
+      message.contains('expired') ||
+      message.contains('401')) {
+    return 'Please log in again before applying.';
+  }
+  if (message.contains('already exists')) {
+    return 'You have already applied for this job.';
+  }
+  return message.isEmpty ? 'Something went wrong. Try again.' : message;
 }
 
 class _JobDetailSummary extends StatelessWidget {

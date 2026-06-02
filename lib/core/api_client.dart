@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import 'api_config.dart';
 import 'auth_tokens.dart';
@@ -43,6 +45,61 @@ class ApiClient {
   Future<void> delete(String path, {bool auth = true}) async {
     final response = await _send('DELETE', path, auth: auth);
     if (response.body.isNotEmpty) _decode(response);
+  }
+
+  Future<Map<String, dynamic>> uploadFile(
+    String path, {
+    required String fieldName,
+    required String filename,
+    required Uint8List bytes,
+    required String contentType,
+    bool auth = true,
+    bool retrying = false,
+  }) async {
+    const requestTimeout = Duration(seconds: 90);
+    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Accept'] = 'application/json'
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          fieldName,
+          bytes,
+          filename: filename,
+          contentType: _mediaType(contentType),
+        ),
+      );
+
+    if (auth) {
+      if (await _tokenStorage.shouldRefreshAccessToken()) {
+        await refreshSession();
+      }
+      final accessToken = await _tokenStorage.readAccessToken();
+      if (accessToken != null) {
+        request.headers['Authorization'] = 'Bearer $accessToken';
+      }
+    }
+
+    try {
+      final streamed = await _httpClient.send(request).timeout(requestTimeout);
+      final response = await http.Response.fromStream(streamed);
+      if (auth && response.statusCode == 401 && !retrying) {
+        await refreshSession();
+        return uploadFile(
+          path,
+          fieldName: fieldName,
+          filename: filename,
+          bytes: bytes,
+          contentType: contentType,
+          auth: auth,
+          retrying: true,
+        );
+      }
+      return _decode(response);
+    } on TimeoutException {
+      throw const ApiException(
+        'The upload is taking longer than expected. Please try again.',
+      );
+    }
   }
 
   Future<http.Response> _send(
@@ -148,6 +205,12 @@ class ApiClient {
 
     return data;
   }
+}
+
+MediaType _mediaType(String value) {
+  final parts = value.split('/');
+  if (parts.length != 2) return MediaType('application', 'octet-stream');
+  return MediaType(parts.first, parts.last);
 }
 
 class ApiException implements Exception {

@@ -22,6 +22,35 @@ class _LiveChatPageState extends State<_LiveChatPage> {
     });
   }
 
+  Future<void> createConversation() async {
+    final title = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _CreateChatSheet(),
+    );
+    if (title == null || title.trim().isEmpty) return;
+    try {
+      final conversation = await AppRepository().createConversation(
+        title: title.trim(),
+      );
+      await refresh();
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        _adaptivePageRoute(
+          context,
+          builder: (_) => _ChatThreadPage(conversation: conversation),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_chatError(error))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -47,7 +76,10 @@ class _LiveChatPageState extends State<_LiveChatPage> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(18, 14, 18, 26),
                   children: [
-                    _WhatsAppHeader(onBack: () => Navigator.pop(context)),
+                    _WhatsAppHeader(
+                      onBack: () => Navigator.pop(context),
+                      onCreate: createConversation,
+                    ),
                     const SizedBox(height: 14),
                     const _ChatSearchField(),
                     const SizedBox(height: 12),
@@ -71,9 +103,10 @@ class _LiveChatPageState extends State<_LiveChatPage> {
 }
 
 class _WhatsAppHeader extends StatelessWidget {
-  const _WhatsAppHeader({required this.onBack});
+  const _WhatsAppHeader({required this.onBack, required this.onCreate});
 
   final VoidCallback onBack;
+  final VoidCallback onCreate;
 
   @override
   Widget build(BuildContext context) {
@@ -91,8 +124,87 @@ class _WhatsAppHeader extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        const SizedBox(width: 40),
+        _PlainIconButton(icon: Icons.add_comment_rounded, onTap: onCreate),
       ],
+    );
+  }
+}
+
+class _CreateChatSheet extends StatefulWidget {
+  const _CreateChatSheet();
+
+  @override
+  State<_CreateChatSheet> createState() => _CreateChatSheetState();
+}
+
+class _CreateChatSheetState extends State<_CreateChatSheet> {
+  final controller = TextEditingController();
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Start a chat',
+                  style: GoogleFonts.inter(
+                    color: Colors.black,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'Conversation title',
+                    filled: true,
+                    fillColor: const Color(0xFFF7F8FC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, controller.text),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF34368C),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  child: const Text('Create chat'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -182,7 +294,7 @@ class _WhatsAppConversationTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        latest?.body ?? 'No messages yet',
+                        _latestMessagePreview(latest),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
@@ -216,6 +328,7 @@ class _ChatThreadPage extends StatefulWidget {
 class _ChatThreadPageState extends State<_ChatThreadPage> {
   final controller = TextEditingController();
   late Future<List<AppMessage>> messagesFuture;
+  bool sendingMedia = false;
 
   @override
   void initState() {
@@ -244,6 +357,44 @@ class _ChatThreadPageState extends State<_ChatThreadPage> {
         widget.conversation.id,
       );
     });
+  }
+
+  Future<void> sendMedia(ImageSource source, {required bool video}) async {
+    if (sendingMedia) return;
+    final picker = ImagePicker();
+    final picked = video
+        ? await picker.pickVideo(source: source)
+        : await picker.pickImage(source: source, imageQuality: 88);
+    if (picked == null) return;
+
+    setState(() => sendingMedia = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final mediaType = picked.mimeType ?? (video ? 'video/mp4' : 'image/jpeg');
+      final uploaded = await AppRepository().uploadChatMedia(
+        filename: picked.name,
+        bytes: bytes,
+        contentType: mediaType,
+      );
+      await AppRepository().sendConversationMessage(
+        conversationId: widget.conversation.id,
+        body: '',
+        mediaUrl: uploaded.url,
+        mediaType: uploaded.contentType,
+      );
+      setState(() {
+        messagesFuture = AppRepository().loadConversationMessages(
+          widget.conversation.id,
+        );
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_chatError(error))),
+      );
+    } finally {
+      if (mounted) setState(() => sendingMedia = false);
+    }
   }
 
   @override
@@ -314,6 +465,18 @@ class _ChatThreadPageState extends State<_ChatThreadPage> {
                       ),
                     ),
                     const SizedBox(width: 10),
+                    _CircleIconButton(
+                      icon: sendingMedia
+                          ? Icons.hourglass_top_rounded
+                          : Icons.add_photo_alternate_rounded,
+                      onTap: () => sendMedia(ImageSource.gallery, video: false),
+                    ),
+                    const SizedBox(width: 10),
+                    _CircleIconButton(
+                      icon: Icons.videocam_rounded,
+                      onTap: () => sendMedia(ImageSource.gallery, video: true),
+                    ),
+                    const SizedBox(width: 10),
                     _CircleIconButton(icon: Icons.send_rounded, onTap: send),
                   ],
                 ),
@@ -324,6 +487,16 @@ class _ChatThreadPageState extends State<_ChatThreadPage> {
       ),
     );
   }
+}
+
+String _chatError(Object error) {
+  final message = error.toString().replaceFirst('Exception: ', '');
+  if (message.contains('Session expired') ||
+      message.contains('Authentication') ||
+      message.contains('401')) {
+    return 'Please log in again to continue chatting.';
+  }
+  return message.isEmpty ? 'Something went wrong. Try again.' : message;
 }
 
 class _ChatBubble extends StatelessWidget {
@@ -354,20 +527,68 @@ class _ChatBubble extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              message.body,
-              style: GoogleFonts.inter(
-                color: Colors.black,
-                fontSize: 12,
-                height: 1.3,
-                letterSpacing: 0,
+            if (message.mediaUrl != null &&
+                message.mediaUrl!.trim().isNotEmpty) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CachedNetworkImage(
+                  imageUrl: ApiConfig.mediaUrl(message.mediaUrl!),
+                  width: 230,
+                  height: 150,
+                  fit: BoxFit.cover,
+                  placeholder: (_, _) => const _ShimmerBlock(
+                    width: 230,
+                    height: 150,
+                    borderRadius: 12,
+                  ),
+                  errorWidget: (_, _, _) => Container(
+                    width: 230,
+                    height: 96,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFEFFC),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      message.mediaType?.contains('video') == true
+                          ? 'Video unavailable'
+                          : 'Image unavailable',
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF34368C),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              if (message.body.trim().isNotEmpty) const SizedBox(height: 8),
+            ],
+            if (message.body.trim().isNotEmpty)
+              Text(
+                message.body,
+                style: GoogleFonts.inter(
+                  color: Colors.black,
+                  fontSize: 12,
+                  height: 1.3,
+                  letterSpacing: 0,
+                ),
+              ),
           ],
         ),
       ),
     );
   }
+}
+
+String _latestMessagePreview(AppMessage? message) {
+  if (message == null) return 'No messages yet';
+  if (message.body.trim().isNotEmpty) return message.body;
+  if (message.mediaUrl?.trim().isNotEmpty == true) {
+    return message.mediaType?.contains('video') == true ? 'Video' : 'Image';
+  }
+  return 'No messages yet';
 }
 
 class _ChatEmptyState extends StatelessWidget {

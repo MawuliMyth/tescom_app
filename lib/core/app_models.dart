@@ -374,6 +374,8 @@ class AppMessage {
     required this.id,
     required this.body,
     required this.authorId,
+    this.mediaUrl,
+    this.mediaType,
     this.author,
     this.createdAt,
   });
@@ -381,6 +383,8 @@ class AppMessage {
   final String id;
   final String body;
   final String authorId;
+  final String? mediaUrl;
+  final String? mediaType;
   final AppUser? author;
   final DateTime? createdAt;
 
@@ -389,6 +393,8 @@ class AppMessage {
       id: json['id'] as String? ?? '',
       body: json['body'] as String? ?? '',
       authorId: json['authorId'] as String? ?? '',
+      mediaUrl: json['mediaUrl'] as String?,
+      mediaType: json['mediaType'] as String?,
       author: json['author'] is Map<String, dynamic>
           ? AppUser.fromJson(json['author'] as Map<String, dynamic>)
           : null,
