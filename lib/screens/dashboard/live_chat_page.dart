@@ -806,10 +806,11 @@ class _TelegramComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width < 360;
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+        padding: EdgeInsets.fromLTRB(compact ? 6 : 8, 6, compact ? 6 : 8, 8),
         color: const Color(0xFFEAF1F8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -872,13 +873,14 @@ class _TelegramComposer extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        IconButton(
-                          onPressed: () {},
-                          icon: const Icon(
-                            Icons.emoji_emotions_outlined,
-                            color: Color(0xFF778397),
+                        if (!compact)
+                          IconButton(
+                            onPressed: () {},
+                            icon: const Icon(
+                              Icons.emoji_emotions_outlined,
+                              color: Color(0xFF778397),
+                            ),
                           ),
-                        ),
                         Expanded(
                           child: TextField(
                             controller: controller,
@@ -911,13 +913,13 @@ class _TelegramComposer extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: compact ? 6 : 8),
                 InkWell(
                   onTap: sendingText ? null : onSend,
                   borderRadius: BorderRadius.circular(24),
                   child: Container(
-                    width: 48,
-                    height: 48,
+                    width: compact ? 44 : 48,
+                    height: compact ? 44 : 48,
                     decoration: const BoxDecoration(
                       color: Color(0xFF34368C),
                       shape: BoxShape.circle,
@@ -965,25 +967,30 @@ class _TelegramAttachmentSheet extends StatelessWidget {
         child: SafeArea(
           top: false,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _AttachmentAction(
-                icon: Icons.photo_library_rounded,
-                label: 'Gallery',
-                color: const Color(0xFF35A7FF),
-                onTap: uploading ? null : onPhoto,
+              Expanded(
+                child: _AttachmentAction(
+                  icon: Icons.photo_library_rounded,
+                  label: 'Gallery',
+                  color: const Color(0xFF35A7FF),
+                  onTap: uploading ? null : onPhoto,
+                ),
               ),
-              _AttachmentAction(
-                icon: Icons.camera_alt_rounded,
-                label: 'Camera',
-                color: const Color(0xFF32C770),
-                onTap: uploading ? null : onCamera,
+              Expanded(
+                child: _AttachmentAction(
+                  icon: Icons.camera_alt_rounded,
+                  label: 'Camera',
+                  color: const Color(0xFF32C770),
+                  onTap: uploading ? null : onCamera,
+                ),
               ),
-              _AttachmentAction(
-                icon: Icons.videocam_rounded,
-                label: 'Video',
-                color: const Color(0xFFE84D8A),
-                onTap: uploading ? null : onVideo,
+              Expanded(
+                child: _AttachmentAction(
+                  icon: Icons.videocam_rounded,
+                  label: 'Video',
+                  color: const Color(0xFFE84D8A),
+                  onTap: uploading ? null : onVideo,
+                ),
               ),
             ],
           ),
@@ -1025,6 +1032,8 @@ class _AttachmentAction extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.inter(
                 color: const Color(0xFF657184),
                 fontSize: 12,
@@ -1194,54 +1203,65 @@ class _TelegramMediaPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final mediaUrl = message.mediaUrl ?? '';
     final isVideo = message.mediaType?.contains('video') == true;
-    if (isVideo) {
-      return Container(
-        width: 240,
-        height: 150,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1F2937),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.of(context).size.width * 0.68;
+        final width = maxWidth < 240 ? maxWidth : 240.0;
+        final imageHeight = width * 0.7;
+        final videoHeight = width * 0.62;
+
+        if (isVideo) {
+          return Container(
+            width: width,
+            height: videoHeight,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1F2937),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.play_circle_fill_rounded,
+                color: Colors.white,
+                size: 54,
+              ),
+            ),
+          );
+        }
+        return ClipRRect(
           borderRadius: BorderRadius.circular(14),
-        ),
-        child: const Center(
-          child: Icon(
-            Icons.play_circle_fill_rounded,
-            color: Colors.white,
-            size: 54,
-          ),
-        ),
-      );
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: CachedNetworkImage(
-        imageUrl: ApiConfig.mediaUrl(mediaUrl),
-        width: 240,
-        height: 170,
-        fit: BoxFit.cover,
-        placeholder: (_, _) => const _ShimmerBlock(
-          width: 240,
-          height: 170,
-          borderRadius: 14,
-        ),
-        errorWidget: (_, _, _) => Container(
-          width: 240,
-          height: 112,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: const Color(0xFFEFEFFC),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Text(
-            'Image unavailable',
-            style: GoogleFonts.inter(
-              color: const Color(0xFF34368C),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0,
+          child: CachedNetworkImage(
+            imageUrl: ApiConfig.mediaUrl(mediaUrl),
+            width: width,
+            height: imageHeight,
+            fit: BoxFit.cover,
+            placeholder: (_, _) => _ShimmerBlock(
+              width: width,
+              height: imageHeight,
+              borderRadius: 14,
+            ),
+            errorWidget: (_, _, _) => Container(
+              width: width,
+              height: width * 0.48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFEFFC),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                'Image unavailable',
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF34368C),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
