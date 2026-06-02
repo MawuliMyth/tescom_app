@@ -783,9 +783,53 @@ kbd {
   align-items: start;
 }
 
+.records-workspace {
+  display: block;
+}
+
 .editor {
   min-height: 620px;
   overflow: hidden;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.modal-editor {
+  width: min(920px, 100%);
+  max-height: min(86vh, 900px);
+  min-height: 0;
+  overflow: auto;
+  animation: modal-rise 0.18s ease-out;
+}
+
+@keyframes modal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.sticky-actions {
+  position: sticky;
+  bottom: -28px;
+  margin: 20px -28px -28px;
+  padding: 16px 28px;
+  border-top: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
 }
 
 .form-body {
@@ -809,6 +853,35 @@ h2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  padding: 14px 18px;
+  border-top: 1px solid #edf1f7;
+  border-bottom: 1px solid #edf1f7;
+  background: #fbfdff;
+}
+
+.filter-control {
+  min-width: 180px;
+  flex: 0 1 220px;
+  gap: 6px;
+}
+
+.filter-control span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.filter-control select {
+  min-height: 40px;
+  padding: 9px 12px;
 }
 
 label {

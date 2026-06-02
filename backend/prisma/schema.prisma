@@ -32,6 +32,21 @@ enum SavedItemType {
   ANNOUNCEMENT
 }
 
+enum JobApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  INTERVIEW_SCHEDULED
+  INTERVIEWED
+  OFFERED
+  REJECTED
+}
+
+enum ConversationRole {
+  OWNER
+  MODERATOR
+  MEMBER
+}
+
 model User {
   id             String         @id @default(cuid())
   email          String         @unique
@@ -48,9 +63,17 @@ model User {
   chapter        Chapter?       @relation(fields: [chapterId], references: [id])
   pollVotes      PollVote[]
   messages       Message[]
+  conversationParticipants ConversationParticipant[]
   notifications  Notification[]
   savedItems     SavedItem[]
   refreshTokens  RefreshToken[]
+  createdNews    NewsArticle[]  @relation("NewsCreator")
+  createdEvents  Event[]        @relation("EventCreator")
+  createdAnnouncements Announcement[] @relation("AnnouncementCreator")
+  createdJobs    Job[]          @relation("JobCreator")
+  createdPolls   Poll[]         @relation("PollCreator")
+  createdConversations Conversation[] @relation("ConversationCreator")
+  jobApplications JobApplication[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -89,8 +112,12 @@ model NewsArticle {
   imageUrls   String[]      @default([])
   status      PublishStatus @default(DRAFT)
   publishedAt DateTime?
+  creatorId   String?
+  creator     User?         @relation("NewsCreator", fields: [creatorId], references: [id], onDelete: SetNull)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  @@index([creatorId])
 }
 
 model Event {
@@ -109,8 +136,13 @@ model Event {
   status      PublishStatus @default(PUBLISHED)
   chapterId   String?
   chapter     Chapter?      @relation(fields: [chapterId], references: [id])
+  creatorId   String?
+  creator     User?         @relation("EventCreator", fields: [creatorId], references: [id], onDelete: SetNull)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  @@index([creatorId])
+  @@index([chapterId])
 }
 
 model Announcement {
@@ -120,8 +152,12 @@ model Announcement {
   priority    String        @default("normal")
   status      PublishStatus @default(DRAFT)
   publishedAt DateTime?
+  creatorId   String?
+  creator     User?         @relation("AnnouncementCreator", fields: [creatorId], references: [id], onDelete: SetNull)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  @@index([creatorId])
 }
 
 model Job {
@@ -135,8 +171,38 @@ model Job {
   applyUrl    String?
   deadline    DateTime?
   status      PublishStatus @default(DRAFT)
+  creatorId   String?
+  creator     User?         @relation("JobCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  applications JobApplication[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  @@index([creatorId])
+}
+
+model JobApplication {
+  id             String               @id @default(cuid())
+  jobId          String
+  job            Job                  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  fullName       String
+  email          String
+  phone          String?
+  institution    String?
+  coverNote      String?
+  credentialsUrl String?
+  supportingUrl  String?
+  status         JobApplicationStatus @default(APPLIED)
+  interviewAt    DateTime?
+  interviewNote  String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([jobId, email])
+  @@index([jobId])
+  @@index([userId])
+  @@index([status])
 }
 
 model Poll {
@@ -145,10 +211,16 @@ model Poll {
   description String?
   status      PublishStatus @default(DRAFT)
   closesAt    DateTime?
+  visibility  String        @default("members")
+  allowMultipleVotes Boolean @default(false)
   options     PollOption[]
   votes       PollVote[]
+  creatorId   String?
+  creator     User?         @relation("PollCreator", fields: [creatorId], references: [id], onDelete: SetNull)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  @@index([creatorId])
 }
 
 model PollOption {
@@ -176,14 +248,34 @@ model Conversation {
   id        String    @id @default(cuid())
   title     String
   isGroup   Boolean   @default(true)
+  creatorId String?
+  creator   User?     @relation("ConversationCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  participants ConversationParticipant[]
   messages  Message[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  @@index([creatorId])
+}
+
+model ConversationParticipant {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           ConversationRole @default(MEMBER)
+  joinedAt       DateTime         @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
 }
 
 model Message {
   id             String       @id @default(cuid())
   body           String
+  mediaUrl       String?
+  mediaType      String?
   authorId       String
   author         User         @relation(fields: [authorId], references: [id])
   conversationId String

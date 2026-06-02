@@ -104,6 +104,7 @@ type ResourceKey =
   | "events"
   | "announcements"
   | "jobs"
+  | "jobApplications"
   | "polls"
   | "conversations"
   | "notifications"
@@ -140,6 +141,10 @@ type AdminRecord = Record<string, unknown> & {
   summary?: string;
   description?: string;
   company?: string;
+  job?: AdminRecord;
+  interviewAt?: string;
+  institution?: string;
+  coverNote?: string;
   body?: string;
   status?: string;
   resolved?: boolean;
@@ -297,6 +302,23 @@ const resources: Resource[] = [
     ]
   },
   {
+    key: "jobApplications",
+    label: "Job Applicants",
+    endpoint: "jobApplications",
+    icon: <Inbox size={18} />,
+    fields: [
+      { key: "jobId", label: "Job ID" },
+      { key: "fullName", label: "Applicant name" },
+      { key: "email", label: "Email" },
+      { key: "phone", label: "Phone" },
+      { key: "institution", label: "Institution" },
+      { key: "coverNote", label: "Cover note", type: "textarea" },
+      { key: "status", label: "Stage", type: "select", options: ["APPLIED", "SHORTLISTED", "INTERVIEW_SCHEDULED", "INTERVIEWED", "OFFERED", "REJECTED"] },
+      { key: "interviewAt", label: "Interview at", type: "datetime-local" },
+      { key: "interviewNote", label: "Interview note", type: "textarea" }
+    ]
+  },
+  {
     key: "polls",
     label: "Polls",
     endpoint: "polls",
@@ -304,6 +326,8 @@ const resources: Resource[] = [
     fields: [
       { key: "question", label: "Question" },
       { key: "description", label: "Description", type: "textarea" },
+      { key: "visibility", label: "Visibility", type: "select", options: ["members", "public", "executives"] },
+      { key: "allowMultipleVotes", label: "Allow multiple votes", type: "checkbox" },
       { key: "status", label: "Status", type: "select", options: publishOptions },
       { key: "closesAt", label: "Closes at", type: "datetime-local" }
     ]
@@ -735,7 +759,7 @@ function DashboardOverview({ onOpenResource }: { onOpenResource: (key: ResourceK
     };
   });
   const maxWeeklyActivity = Math.max(...weeklyActivity.map((item) => item.count), 1);
-  const contentKeys: ResourceKey[] = ["news", "events", "announcements", "jobs", "polls"];
+  const contentKeys: ResourceKey[] = ["news", "events", "announcements", "jobs", "jobApplications", "polls"];
   const communityKeys: ResourceKey[] = ["users", "executives", "chapters", "conversations"];
   const inboxKeys: ResourceKey[] = ["notifications", "contacts"];
   const distribution = {
@@ -919,23 +943,34 @@ function ResourceManager({ resource }: { resource: Resource }) {
   const [rows, setRows] = useState<AdminRecord[]>([]);
   const [chapterOptions, setChapterOptions] = useState<SelectOption[]>([]);
   const [editing, setEditing] = useState<AdminRecord | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [form, setForm] = useState<Record<string, unknown>>(() => defaultFormFor(resource));
   const [notice, setNotice] = useState<Notice | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<Record<string, string>>({});
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return rows;
-    return rows.filter((row) =>
-      [row.title, row.fullName, row.name, row.question, row.email, row.topic, row.summary, row.description]
+    return rows.filter((row) => {
+      const matchesSearch = !needle || [row.title, row.fullName, row.name, row.question, row.email, row.topic, row.summary, row.description, row.company, row.institution, row.organizationRole]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle))
-    );
-  }, [query, rows]);
+        .some((value) => String(value).toLowerCase().includes(needle));
+      if (!matchesSearch) return false;
+
+      return Object.entries(filters).every(([key, value]) => {
+        if (!value) return true;
+        return filterValueFor(row, key).toLowerCase() === value.toLowerCase();
+      });
+    });
+  }, [filters, query, rows]);
+
+  const activeFilters = useMemo(() => buildFilters(resource, rows), [resource, rows]);
 
   useEffect(() => {
     setEditing(null);
+    setEditorOpen(false);
+    setFilters({});
     setForm(defaultFormFor(resource));
     load();
   }, [resource.key]);
@@ -1002,6 +1037,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
         await request("", { method: "POST", body: JSON.stringify(payload) });
       }
       setEditing(null);
+      setEditorOpen(false);
       setForm(defaultFormFor(resource));
       await load();
       setNotice({ type: "success", message: editing ? "Record updated successfully." : "Record created successfully." });
@@ -1025,53 +1061,19 @@ function ResourceManager({ resource }: { resource: Resource }) {
     setEditing(row);
     setForm(toEditableForm(row, fields));
     setNotice(null);
+    setEditorOpen(true);
+  }
+
+  function startCreate() {
+    setEditing(null);
+    setForm(defaultFormFor(resource));
+    setNotice(null);
+    setEditorOpen(true);
   }
 
   return (
     <PullToRefresh onRefresh={load}>
-      <section className="workspace">
-      <form className="editor" onSubmit={save}>
-        <div className="form-body">
-          <div className="panel-title">
-            <div>
-              <span>{editing ? "Editing" : "New entry"}</span>
-              <h2>{editing ? "Edit record" : `Create ${resource.label.slice(0, -1) || "record"}`}</h2>
-            </div>
-            <div className="panel-icon">{editing ? <Pencil size={18} /> : <Plus size={18} />}</div>
-          </div>
-          <div className="field-grid">
-            {fields.map((field) => (
-              <FieldInput
-                key={field.key}
-                field={field}
-                value={form[field.key]}
-                onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
-              />
-            ))}
-          </div>
-          <NoticeMessage notice={notice} />
-          <div className="actions">
-            <ActionButton onClick={() => setForm(defaultFormFor(resource))}>
-              Draft reset
-            </ActionButton>
-            <button className="primary">
-              {editing ? <SaveIcon /> : <Plus size={16} />}
-              {editing ? "Save changes" : "Create"}
-            </button>
-            {editing && (
-              <ActionButton
-                onClick={() => {
-                  setEditing(null);
-                  setForm(defaultFormFor(resource));
-                }}
-              >
-                Cancel
-              </ActionButton>
-            )}
-          </div>
-        </div>
-      </form>
-
+      <section className="workspace records-workspace">
       <div className="table-panel">
         <div className="table-header">
           <div>
@@ -1088,8 +1090,35 @@ function ResourceManager({ resource }: { resource: Resource }) {
                 </button>
               )}
             </label>
+            <ActionButton icon={Plus} variant="primary" onClick={startCreate}>
+              {resourceActionLabel(resource)}
+            </ActionButton>
           </div>
         </div>
+        {activeFilters.length > 0 && (
+          <div className="filter-row">
+            {activeFilters.map((filter) => (
+              <label key={filter.key} className="filter-control">
+                <span>{filter.label}</span>
+                <select
+                  value={filters[filter.key] ?? ""}
+                  onChange={(event) => setFilters((current) => ({ ...current, [filter.key]: event.target.value }))}
+                >
+                  <option value="">All</option>
+                  {filter.options.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </label>
+            ))}
+            {Object.values(filters).some(Boolean) && (
+              <ActionButton variant="ghost" onClick={() => setFilters({})}>
+                Clear filters
+              </ActionButton>
+            )}
+          </div>
+        )}
+        <NoticeMessage notice={notice} />
         <div className="table-scroll">
           {loading ? (
             <TableSkeleton />
@@ -1110,8 +1139,8 @@ function ResourceManager({ resource }: { resource: Resource }) {
                     <div className="record-title">
                       <Thumbnail row={row} />
                       <div>
-                        <strong>{row.title ?? row.fullName ?? row.name ?? row.question ?? row.email ?? row.topic}</strong>
-                        <span>{row.summary ?? row.description ?? row.email ?? row.company ?? row.body}</span>
+                        <strong>{recordTitle(row)}</strong>
+                        <span>{recordSubtitle(row)}</span>
                       </div>
                     </div>
                   </td>
@@ -1128,7 +1157,8 @@ function ResourceManager({ resource }: { resource: Resource }) {
                   <td colSpan={4} className="empty">
                     <EmptyState
                       title={query ? "No matching records" : "No records yet"}
-                      message={query ? "Try a different search term or clear the search box." : `Create your first ${resource.label.toLowerCase()} record from the form.`}
+                      message={query ? "Try a different search term or clear the search box." : `Use ${resourceActionLabel(resource).toLowerCase()} when you are ready to create live data.`}
+                      action={!query ? <ActionButton icon={Plus} variant="primary" onClick={startCreate}>{resourceActionLabel(resource)}</ActionButton> : null}
                     />
                   </td>
                 </tr>
@@ -1138,6 +1168,48 @@ function ResourceManager({ resource }: { resource: Resource }) {
           )}
         </div>
       </div>
+      {editorOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <form className="editor modal-editor" onSubmit={save}>
+            <div className="form-body">
+              <div className="panel-title">
+                <div>
+                  <span>{editing ? "Editing" : "New entry"}</span>
+                  <h2>{editing ? "Edit record" : resourceActionLabel(resource)}</h2>
+                </div>
+                <IconButton
+                  icon={X}
+                  label="Close form"
+                  onClick={() => {
+                    setEditorOpen(false);
+                    setEditing(null);
+                    setForm(defaultFormFor(resource));
+                  }}
+                />
+              </div>
+              <div className="field-grid">
+                {fields.map((field) => (
+                  <FieldInput
+                    key={field.key}
+                    field={field}
+                    value={form[field.key]}
+                    onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
+                  />
+                ))}
+              </div>
+              <div className="actions sticky-actions">
+                <ActionButton onClick={() => setForm(editing ? toEditableForm(editing, fields) : defaultFormFor(resource))}>
+                  Reset
+                </ActionButton>
+                <button className="primary">
+                  {editing ? <SaveIcon /> : <Plus size={16} />}
+                  {editing ? "Save changes" : "Create"}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
       </section>
     </PullToRefresh>
   );
@@ -1145,6 +1217,65 @@ function ResourceManager({ resource }: { resource: Resource }) {
 
 function SaveIcon() {
   return <UploadCloud size={16} />;
+}
+
+function resourceActionLabel(resource: Resource) {
+  const labels: Partial<Record<ResourceKey, string>> = {
+    users: "Add Member",
+    executives: "Create Executive",
+    chapters: "Create Chapter",
+    news: "Create News",
+    events: "Create Event",
+    announcements: "Create Announcement",
+    jobs: "Post Job",
+    jobApplications: "Add Applicant",
+    polls: "Create Poll",
+    conversations: "Create Chat",
+    notifications: "Create Notification",
+    contacts: "Add Contact"
+  };
+  return labels[resource.key] ?? `Create ${resource.label}`;
+}
+
+function recordTitle(row: AdminRecord) {
+  return row.title ?? row.fullName ?? row.name ?? row.question ?? row.email ?? row.topic ?? "Untitled record";
+}
+
+function recordSubtitle(row: AdminRecord) {
+  if (row.job?.title) return `${row.job.title}${row.institution ? ` - ${row.institution}` : ""}`;
+  return row.summary ?? row.description ?? row.email ?? row.company ?? row.institution ?? row.organizationRole ?? row.body ?? "";
+}
+
+function filterValueFor(row: AdminRecord, key: string) {
+  if (key === "campus") return String(row.institution ?? row.name ?? row.job?.institution ?? "");
+  if (key === "position") return String(row.organizationRole ?? "");
+  if (key === "status") return String(row.status ?? (row.resolved ? "Resolved" : "Open"));
+  if (key === "type") return String(row.type ?? "");
+  if (key === "company") return String(row.company ?? row.job?.company ?? "");
+  return String(row[key] ?? "");
+}
+
+function buildFilters(resource: Resource, rows: AdminRecord[]) {
+  const keysByResource: Partial<Record<ResourceKey, { key: string; label: string }[]>> = {
+    users: [{ key: "campus", label: "Campus / school" }, { key: "position", label: "Role" }, { key: "status", label: "Status" }],
+    executives: [{ key: "campus", label: "Campus / school" }, { key: "position", label: "Position" }, { key: "status", label: "Status" }],
+    chapters: [{ key: "campus", label: "Campus / school" }],
+    news: [{ key: "status", label: "Status" }, { key: "category", label: "Category" }],
+    events: [{ key: "status", label: "Status" }, { key: "venue", label: "Venue" }],
+    announcements: [{ key: "status", label: "Status" }, { key: "priority", label: "Priority" }],
+    jobs: [{ key: "status", label: "Status" }, { key: "type", label: "Type" }, { key: "company", label: "Company" }],
+    jobApplications: [{ key: "status", label: "Stage" }, { key: "campus", label: "Campus / school" }],
+    polls: [{ key: "status", label: "Status" }, { key: "visibility", label: "Visibility" }],
+    conversations: [{ key: "isGroup", label: "Type" }],
+    contacts: [{ key: "status", label: "Status" }]
+  };
+
+  return (keysByResource[resource.key] ?? [])
+    .map((filter) => ({
+      ...filter,
+      options: Array.from(new Set(rows.map((row) => filterValueFor(row, filter.key)).filter(Boolean))).sort()
+    }))
+    .filter((filter) => filter.options.length > 0);
 }
 
 function StatusPill({ value }: { value: unknown }) {

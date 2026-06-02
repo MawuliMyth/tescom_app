@@ -23,6 +23,7 @@ import {
 } from "./utils/auth.js";
 
 const app = express();
+const db = prisma as any;
 
 const corsOrigins = env.CORS_ORIGIN?.split(",").map((origin) => origin.trim()).filter(Boolean);
 const uploadDir = path.resolve("storage/uploads");
@@ -88,6 +89,18 @@ const adminListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25)
 });
+const jobApplicationStatusSchema = z.enum([
+  "APPLIED",
+  "SHORTLISTED",
+  "INTERVIEW_SCHEDULED",
+  "INTERVIEWED",
+  "OFFERED",
+  "REJECTED"
+]);
+const optionalStringSchema = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.string().optional()
+);
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -123,6 +136,9 @@ const publicMessageInclude = {
 } as const;
 
 const publicConversationInclude = {
+  participants: {
+    include: { user: { select: publicUserSelect } }
+  },
   messages: {
     include: publicMessageInclude,
     orderBy: { createdAt: "asc" as const },
@@ -282,13 +298,17 @@ const adminSchemas = {
       question: z.string().min(2),
       description: z.string().optional(),
       status: publishStatusSchema.default("DRAFT"),
-      closesAt: optionalDateSchema
+      closesAt: optionalDateSchema,
+      visibility: z.string().min(2).default("members"),
+      allowMultipleVotes: z.boolean().default(false)
     }),
     update: z.object({
       question: z.string().min(2).optional(),
       description: z.string().optional(),
       status: publishStatusSchema.optional(),
-      closesAt: optionalDateSchema
+      closesAt: optionalDateSchema,
+      visibility: z.string().min(2).optional(),
+      allowMultipleVotes: z.boolean().optional()
     })
   },
   conversations: {
@@ -323,6 +343,34 @@ const adminSchemas = {
       topic: z.string().min(2).optional(),
       message: z.string().min(5).optional(),
       resolved: z.boolean().optional()
+    })
+  },
+  jobApplications: {
+    create: z.object({
+      jobId: z.string().min(1),
+      userId: z.string().optional(),
+      fullName: z.string().min(2),
+      email: z.string().email(),
+      phone: z.string().optional(),
+      institution: z.string().optional(),
+      coverNote: z.string().optional(),
+      credentialsUrl: optionalImageReferenceSchema,
+      supportingUrl: optionalImageReferenceSchema,
+      status: jobApplicationStatusSchema.default("APPLIED"),
+      interviewAt: optionalDateSchema,
+      interviewNote: z.string().optional()
+    }),
+    update: z.object({
+      fullName: z.string().min(2).optional(),
+      email: z.string().email().optional(),
+      phone: z.string().optional(),
+      institution: z.string().optional(),
+      coverNote: z.string().optional(),
+      credentialsUrl: optionalImageReferenceSchema,
+      supportingUrl: optionalImageReferenceSchema,
+      status: jobApplicationStatusSchema.optional(),
+      interviewAt: optionalDateSchema,
+      interviewNote: z.string().optional()
     })
   }
 } as const;
@@ -544,8 +592,14 @@ app.patch("/api/app/notifications/:id/read", requireAuth, asyncHandler(async (re
   res.json({ notification });
 }));
 
-app.get("/api/app/conversations", requireAuth, asyncHandler(async (_req, res) => {
-  const conversations = await prisma.conversation.findMany({
+app.get("/api/app/conversations", requireAuth, asyncHandler(async (req, res) => {
+  const conversations = await db.conversation.findMany({
+    where: {
+      OR: [
+        { creatorId: req.user!.id },
+        { participants: { some: { userId: req.user!.id } } }
+      ]
+    },
     include: publicConversationInclude,
     orderBy: { updatedAt: "desc" },
     take: 100
@@ -555,13 +609,19 @@ app.get("/api/app/conversations", requireAuth, asyncHandler(async (_req, res) =>
 
 app.get("/api/app/conversations/:id/messages", requireAuth, asyncHandler(async (req, res) => {
   const id = String(req.params.id);
-  const conversation = await prisma.conversation.findUnique({
-    where: { id },
+  const conversation = await db.conversation.findFirst({
+    where: {
+      id,
+      OR: [
+        { creatorId: req.user!.id },
+        { participants: { some: { userId: req.user!.id } } }
+      ]
+    },
     select: { id: true }
   });
   if (!conversation) return res.status(404).json({ message: "Conversation not found" });
 
-  const messages = await prisma.message.findMany({
+  const messages = await db.message.findMany({
     where: { conversationId: id },
     include: publicMessageInclude,
     orderBy: { createdAt: "asc" },
@@ -572,26 +632,103 @@ app.get("/api/app/conversations/:id/messages", requireAuth, asyncHandler(async (
 
 app.post("/api/app/conversations/:id/messages", requireAuth, asyncHandler(async (req, res) => {
   const id = String(req.params.id);
-  const body = z.object({ body: z.string().min(1).max(1000) }).parse(req.body);
-  const conversation = await prisma.conversation.findUnique({
-    where: { id },
+  const body = z.object({
+    body: z.string().max(1000).default(""),
+    mediaUrl: optionalImageReferenceSchema,
+    mediaType: optionalStringSchema
+  }).refine((value) => value.body.trim().length > 0 || Boolean(value.mediaUrl), {
+    message: "Message text or media is required"
+  }).parse(req.body);
+  const conversation = await db.conversation.findFirst({
+    where: {
+      id,
+      OR: [
+        { creatorId: req.user!.id },
+        { participants: { some: { userId: req.user!.id } } }
+      ]
+    },
     select: { id: true }
   });
   if (!conversation) return res.status(404).json({ message: "Conversation not found" });
 
-  const message = await prisma.message.create({
+  const message = await db.message.create({
     data: {
       body: body.body,
+      mediaUrl: body.mediaUrl ?? undefined,
+      mediaType: body.mediaType ?? undefined,
       conversationId: id,
       authorId: req.user!.id
     },
     include: publicMessageInclude
   });
-  await prisma.conversation.update({
+  await db.conversation.update({
     where: { id },
     data: { updatedAt: new Date() }
   });
   res.status(201).json({ message });
+}));
+
+app.post("/api/app/conversations/:id/participants", requireAuth, asyncHandler(async (req, res) => {
+  const id = String(req.params.id);
+  const body = z.object({ userId: z.string().min(1) }).parse(req.body);
+  const conversation = await db.conversation.findFirst({
+    where: {
+      id,
+      OR: [
+        { creatorId: req.user!.id },
+        { participants: { some: { userId: req.user!.id, role: { in: ["OWNER", "MODERATOR"] } } } }
+      ]
+    },
+    select: { id: true }
+  });
+  if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+
+  const participant = await db.conversationParticipant.upsert({
+    where: { conversationId_userId: { conversationId: id, userId: body.userId } },
+    update: {},
+    create: { conversationId: id, userId: body.userId }
+  });
+  res.status(201).json({ participant });
+}));
+
+app.post("/api/app/jobs/:id/apply", requireAuth, asyncHandler(async (req, res) => {
+  const id = String(req.params.id);
+  const currentUser = await prisma.user.findUnique({ where: { id: req.user!.id }, select: publicUserSelect });
+  const body = z.object({
+    fullName: z.string().min(2).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().optional(),
+    institution: z.string().optional(),
+    coverNote: z.string().max(2000).optional(),
+    credentialsUrl: optionalImageReferenceSchema,
+    supportingUrl: optionalImageReferenceSchema
+  }).parse(req.body);
+  const job = await prisma.job.findFirst({ where: { id, status: "PUBLISHED" }, select: { id: true } });
+  if (!job) return res.status(404).json({ message: "Job not found" });
+  if (!currentUser) return res.status(401).json({ message: "Authentication required" });
+
+  const application = await db.jobApplication.upsert({
+    where: { jobId_email: { jobId: id, email: body.email ?? currentUser.email } },
+    update: {
+      phone: body.phone ?? currentUser.phone,
+      institution: body.institution ?? currentUser.institution,
+      coverNote: body.coverNote,
+      credentialsUrl: body.credentialsUrl ?? undefined,
+      supportingUrl: body.supportingUrl ?? undefined
+    },
+    create: {
+      jobId: id,
+      userId: currentUser.id,
+      fullName: body.fullName ?? currentUser.fullName,
+      email: body.email ?? currentUser.email,
+      phone: body.phone ?? currentUser.phone,
+      institution: body.institution ?? currentUser.institution,
+      coverNote: body.coverNote,
+      credentialsUrl: body.credentialsUrl ?? undefined,
+      supportingUrl: body.supportingUrl ?? undefined
+    }
+  });
+  res.status(201).json({ application });
 }));
 
 app.get("/api/app/saved-items", requireAuth, asyncHandler(async (req, res) => {
@@ -683,29 +820,120 @@ const resources = {
   events: { delegate: prisma.event },
   announcements: { delegate: prisma.announcement },
   jobs: { delegate: prisma.job },
-  polls: { delegate: prisma.poll, include: { options: true } },
-  conversations: { delegate: prisma.conversation, include: { messages: true } },
+  jobApplications: {
+    delegate: db.jobApplication,
+    include: { job: true, user: { select: publicUserSelect } }
+  },
+  polls: { delegate: prisma.poll, include: { options: { include: { _count: { select: { votes: true } } } } } },
+  conversations: { delegate: prisma.conversation, include: publicConversationInclude },
   notifications: { delegate: prisma.notification },
   contacts: { delegate: prisma.contactMessage }
 } as const;
+
+const ownedResourceNames = new Set(["news", "events", "announcements", "jobs", "polls", "conversations"]);
+const executiveWritableResourceNames = new Set([
+  "news",
+  "events",
+  "announcements",
+  "jobs",
+  "jobApplications",
+  "polls",
+  "conversations"
+]);
+
+async function getDashboardUser(req: express.Request) {
+  const cached = (req as any).dashboardUser;
+  if (cached) return cached as {
+    id: string;
+    role: "USER" | "ADMIN" | "SUPER_ADMIN";
+    status: "PENDING" | "ACTIVE" | "SUSPENDED";
+    organizationRole: string | null;
+  };
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { id: true, role: true, status: true, organizationRole: true }
+  });
+  (req as any).dashboardUser = user;
+  return user;
+}
+
+const isFullAdmin = (user?: { role: string } | null) => Boolean(user && ["ADMIN", "SUPER_ADMIN"].includes(user.role));
+const canUseDashboard = (user?: { role: string; status: string; organizationRole: string | null } | null) =>
+  Boolean(user && user.status === "ACTIVE" && (isFullAdmin(user) || user.organizationRole));
+
+const requireDashboardAccess: express.RequestHandler = (req, res, next) => {
+  void getDashboardUser(req)
+    .then((user) => {
+      if (!canUseDashboard(user)) {
+        return res.status(403).json({ message: "Dashboard access required" });
+      }
+      return next();
+    })
+    .catch(next);
+};
+
+async function scopedWhere(req: express.Request, resourceName: string, baseWhere: Record<string, unknown> = {}) {
+  const user = await getDashboardUser(req);
+  if (isFullAdmin(user) || !ownedResourceNames.has(resourceName)) return baseWhere;
+  return { ...baseWhere, creatorId: req.user!.id };
+}
+
+async function dashboardResourceWhere(req: express.Request, resourceName: string, baseWhere: Record<string, unknown> = {}) {
+  const user = await getDashboardUser(req);
+  if (isFullAdmin(user)) return baseWhere;
+  if (resourceName === "jobApplications") return { ...baseWhere, job: { creatorId: req.user!.id } };
+  if (ownedResourceNames.has(resourceName)) return { ...baseWhere, creatorId: req.user!.id };
+  return { ...baseWhere, id: "__no_access__" };
+}
+
+async function ensureCanMutate(req: express.Request, resourceName: string, id: string, delegate: any) {
+  const user = await getDashboardUser(req);
+  if (isFullAdmin(user)) return true;
+  if (!executiveWritableResourceNames.has(resourceName)) return false;
+  if (resourceName === "jobApplications") {
+    const row = await db.jobApplication.findFirst({
+      where: { id, job: { creatorId: req.user!.id } },
+      select: { id: true }
+    });
+    return Boolean(row);
+  }
+  if (!ownedResourceNames.has(resourceName)) return false;
+  const row = await delegate.findFirst({ where: { id, creatorId: req.user!.id }, select: { id: true } });
+  return Boolean(row);
+}
+
+async function canCreateResource(req: express.Request, resourceName: string) {
+  const user = await getDashboardUser(req);
+  return isFullAdmin(user) || executiveWritableResourceNames.has(resourceName);
+}
+
+async function ownedCreateData(req: express.Request, resourceName: string, data: Record<string, unknown>) {
+  if (!ownedResourceNames.has(resourceName)) return data;
+  const user = await getDashboardUser(req);
+  if (isFullAdmin(user) && data.creatorId) return data;
+  return { ...data, creatorId: req.user!.id };
+}
 
 const executiveWhere = {
   role: "USER" as const,
   organizationRole: { not: null }
 };
 
-app.get("/api/admin/executives", requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+app.get("/api/admin/executives", requireAuth, requireDashboardAccess, asyncHandler(async (req, res) => {
   const { page, pageSize } = adminListQuerySchema.parse(req.query);
   const skip = (page - 1) * pageSize;
+  const user = await getDashboardUser(req);
+  const where = isFullAdmin(user) ? executiveWhere : { id: req.user!.id, ...executiveWhere };
   const [rows, total] = await Promise.all([
     prisma.user.findMany({
-      where: executiveWhere,
+      where,
       select: publicUserSelect,
       orderBy: { fullName: "asc" },
       skip,
       take: pageSize
     }),
-    prisma.user.count({ where: executiveWhere })
+    prisma.user.count({ where })
   ]);
 
   res.json({
@@ -717,9 +945,10 @@ app.get("/api/admin/executives", requireAuth, requireAdmin, asyncHandler(async (
   });
 }));
 
-app.get("/api/admin/executives/:id", requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+app.get("/api/admin/executives/:id", requireAuth, requireDashboardAccess, asyncHandler(async (req, res) => {
+  const user = await getDashboardUser(req);
   const row = await prisma.user.findFirst({
-    where: { id: String(req.params.id), ...executiveWhere },
+    where: { id: String(req.params.id), ...executiveWhere, ...(isFullAdmin(user) ? {} : { id: req.user!.id }) },
     select: publicUserSelect
   });
   if (!row) return res.status(404).json({ message: "Executive not found" });
@@ -766,20 +995,22 @@ app.delete("/api/admin/executives/:id", requireAuth, requireAdmin, asyncHandler(
 
 for (const [name, config] of Object.entries(resources)) {
   const router = express.Router();
-  router.use(requireAuth, requireAdmin);
+  router.use(requireAuth, requireDashboardAccess);
 
-  router.get("/", asyncHandler(async (_req, res) => {
-    const { page, pageSize } = adminListQuerySchema.parse(_req.query);
+  router.get("/", asyncHandler(async (req, res) => {
+    const { page, pageSize } = adminListQuerySchema.parse(req.query);
     const skip = (page - 1) * pageSize;
+    const where = await dashboardResourceWhere(req, name);
     const [rows, total] = await Promise.all([
       (config.delegate as any).findMany({
+        where,
         ...(config as any).include ? { include: (config as any).include } : {},
         ...(config as any).select ? { select: (config as any).select } : {},
         orderBy: { createdAt: "desc" },
         skip,
         take: pageSize
       }),
-      (config.delegate as any).count()
+      (config.delegate as any).count({ where })
     ]);
 
     res.json({
@@ -792,8 +1023,9 @@ for (const [name, config] of Object.entries(resources)) {
   }));
 
   router.get("/:id", asyncHandler(async (req, res) => {
-    const row = await (config.delegate as any).findUnique({
-      where: { id: req.params.id },
+    const where = await dashboardResourceWhere(req, name, { id: String(req.params.id) });
+    const row = await (config.delegate as any).findFirst({
+      where,
       ...(config as any).include ? { include: (config as any).include } : {},
       ...(config as any).select ? { select: (config as any).select } : {}
     });
@@ -802,16 +1034,34 @@ for (const [name, config] of Object.entries(resources)) {
   }));
 
   router.post("/", asyncHandler(async (req, res) => {
+    if (!(await canCreateResource(req, name))) {
+      return res.status(403).json({ message: "You do not have permission to create this record" });
+    }
     const parsed = (adminSchemas as any)[name].create.parse(req.body);
-    const data = (config as any).scrubCreate
+    const rawData = (config as any).scrubCreate
       ? await (config as any).scrubCreate(parsed)
       : parsed;
+    const data = await ownedCreateData(req, name, rawData);
     delete data.password;
-    const row = await (config.delegate as any).create({ data });
+    const row = await (config.delegate as any).create({
+      data,
+      ...(config as any).include ? { include: (config as any).include } : {},
+      ...(config as any).select ? { select: (config as any).select } : {}
+    });
+    if (name === "conversations") {
+      await db.conversationParticipant.upsert({
+        where: { conversationId_userId: { conversationId: row.id, userId: req.user!.id } },
+        update: { role: "OWNER" },
+        create: { conversationId: row.id, userId: req.user!.id, role: "OWNER" }
+      });
+    }
     res.status(201).json({ row });
   }));
 
   router.patch("/:id", asyncHandler(async (req, res) => {
+    if (!(await ensureCanMutate(req, name, String(req.params.id), config.delegate))) {
+      return res.status(403).json({ message: "You do not have permission to edit this record" });
+    }
     const parsed = (adminSchemas as any)[name].update.parse(req.body);
     const data = { ...parsed };
     if (name === "users" && data.password) {
@@ -819,23 +1069,30 @@ for (const [name, config] of Object.entries(resources)) {
       delete data.password;
     }
     const row = await (config.delegate as any).update({
-      where: { id: req.params.id },
-      data
+      where: { id: String(req.params.id) },
+      data,
+      ...(config as any).include ? { include: (config as any).include } : {},
+      ...(config as any).select ? { select: (config as any).select } : {}
     });
     res.json({ row });
   }));
 
   router.delete("/:id", asyncHandler(async (req, res) => {
-    await (config.delegate as any).delete({ where: { id: req.params.id } });
+    if (!(await ensureCanMutate(req, name, String(req.params.id), config.delegate))) {
+      return res.status(403).json({ message: "You do not have permission to delete this record" });
+    }
+    await (config.delegate as any).delete({ where: { id: String(req.params.id) } });
     res.status(204).send();
   }));
 
   app.use(`/api/admin/${name}`, router);
 }
 
-app.post("/api/admin/polls/:pollId/options", requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+app.post("/api/admin/polls/:pollId/options", requireAuth, requireDashboardAccess, asyncHandler(async (req, res) => {
   const pollId = String(req.params.pollId);
   const body = z.object({ text: z.string().min(1) }).parse(req.body);
+  const canEdit = await ensureCanMutate(req, "polls", pollId, prisma.poll);
+  if (!canEdit) return res.status(403).json({ message: "You do not have permission to update this poll" });
   const option = await prisma.pollOption.create({
     data: { pollId, text: body.text }
   });
@@ -845,7 +1102,7 @@ app.post("/api/admin/polls/:pollId/options", requireAuth, requireAdmin, asyncHan
 app.post(
   "/api/admin/uploads",
   requireAuth,
-  requireAdmin,
+  requireDashboardAccess,
   upload.single("file"),
   asyncHandler(async (req, res) => {
     if (!req.file) {
