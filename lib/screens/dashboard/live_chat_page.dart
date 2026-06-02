@@ -47,9 +47,9 @@ class _LiveChatPageState extends State<_LiveChatPage> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_chatError(error))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_chatError(error))));
     }
   }
 
@@ -70,15 +70,15 @@ class _LiveChatPageState extends State<_LiveChatPage> {
             }
             if (snapshot.hasError) return const _InlineErrorState();
 
-            final conversations = (snapshot.data ?? const [])
-                .where((conversation) {
-                  final text = query.toLowerCase();
-                  return conversation.title.toLowerCase().contains(text) ||
-                      _latestMessagePreview(
-                        conversation.latestMessage,
-                      ).toLowerCase().contains(text);
-                })
-                .toList();
+            final conversations = (snapshot.data ?? const []).where((
+              conversation,
+            ) {
+              final text = query.toLowerCase();
+              return conversation.title.toLowerCase().contains(text) ||
+                  _latestMessagePreview(
+                    conversation.latestMessage,
+                  ).toLowerCase().contains(text);
+            }).toList();
 
             return RefreshIndicator.noSpinner(
               onRefresh: refresh,
@@ -140,8 +140,9 @@ class _TelegramChatHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width < 360;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+      padding: EdgeInsets.fromLTRB(compact ? 10 : 14, 8, compact ? 10 : 14, 14),
       decoration: const BoxDecoration(
         color: Color(0xFF34368C),
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
@@ -157,19 +158,18 @@ class _TelegramChatHeader extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Telegram Chat',
+                  compact ? 'Chats' : 'Telegram Chat',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: compact ? 20 : 22,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0,
                   ),
                 ),
               ),
-              _TelegramHeaderButton(
-                icon: Icons.edit_square,
-                onTap: onCreate,
-              ),
+              _TelegramHeaderButton(icon: Icons.edit_square, onTap: onCreate),
             ],
           ),
           const SizedBox(height: 14),
@@ -188,7 +188,10 @@ class _TelegramChatHeader extends StatelessWidget {
                   ? null
                   : IconButton(
                       onPressed: () => onQueryChanged(''),
-                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                      ),
                     ),
               filled: true,
               fillColor: Colors.white.withValues(alpha: 0.16),
@@ -213,12 +216,13 @@ class _TelegramHeaderButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width < 360;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Container(
-        width: 40,
-        height: 40,
+        width: compact ? 36 : 40,
+        height: compact ? 36 : 40,
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.14),
           shape: BoxShape.circle,
@@ -272,139 +276,148 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final sheetHeight = MediaQuery.of(context).size.height * 0.88;
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Material(
         color: Colors.transparent,
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.88,
-          ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 42,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE1E5F0),
-                            borderRadius: BorderRadius.circular(999),
+        child: SizedBox(
+          height: sheetHeight,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 42,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE1E5F0),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 18),
-                      Text(
-                        'New group chat',
-                        style: GoogleFonts.inter(
-                          color: Colors.black,
-                          fontSize: 19,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: controller,
-                        autofocus: true,
-                        decoration: InputDecoration(
-                          hintText: 'Group or chat title',
-                          prefixIcon: const Icon(Icons.group_rounded),
-                          filled: true,
-                          fillColor: const Color(0xFFF4F7FB),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(18),
-                            borderSide: BorderSide.none,
+                        const SizedBox(height: 18),
+                        Text(
+                          'New group chat',
+                          style: GoogleFonts.inter(
+                            color: Colors.black,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: controller,
+                          autofocus: true,
+                          decoration: InputDecoration(
+                            hintText: 'Group or chat title',
+                            prefixIcon: const Icon(Icons.group_rounded),
+                            filled: true,
+                            fillColor: const Color(0xFFF4F7FB),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: FutureBuilder<List<AppUser>>(
-                    future: membersFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Padding(
-                          padding: EdgeInsets.all(20),
-                          child: _ListShimmer(itemCount: 4),
-                        );
-                      }
-                      final members = snapshot.data ?? const [];
-                      if (members.isEmpty) {
-                        return const _ChatEmptyState(
-                          title: 'No members available',
-                          message:
-                              'Members will appear here when they register.',
-                        );
-                      }
-                      return ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        itemCount: members.length,
-                        itemBuilder: (context, index) {
-                          final member = members[index];
-                          final selected = selectedIds.contains(member.id);
-                          return CheckboxListTile(
-                            value: selected,
-                            onChanged: (_) {
-                              setState(() {
-                                selected
-                                    ? selectedIds.remove(member.id)
-                                    : selectedIds.add(member.id);
-                              });
-                            },
-                            activeColor: const Color(0xFF34368C),
-                            secondary: _TelegramAvatar(user: member),
-                            title: Text(
-                              member.fullName,
-                              style: GoogleFonts.inter(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0,
-                              ),
-                            ),
-                            subtitle: Text(
-                              member.institution ?? member.email,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                  Expanded(
+                    child: FutureBuilder<List<AppUser>>(
+                      future: membersFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.all(20),
+                            child: _ListShimmer(itemCount: 4),
                           );
-                        },
-                      );
-                    },
+                        }
+                        final members = snapshot.data ?? const [];
+                        if (members.isEmpty) {
+                          return const _ChatEmptyState(
+                            title: 'No members available',
+                            message:
+                                'Members will appear here when they register.',
+                          );
+                        }
+                        return ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          itemCount: members.length,
+                          itemBuilder: (context, index) {
+                            final member = members[index];
+                            final selected = selectedIds.contains(member.id);
+                            return CheckboxListTile(
+                              value: selected,
+                              onChanged: (_) {
+                                setState(() {
+                                  selected
+                                      ? selectedIds.remove(member.id)
+                                      : selectedIds.add(member.id);
+                                });
+                              },
+                              activeColor: const Color(0xFF34368C),
+                              secondary: _TelegramAvatar(user: member),
+                              title: Text(
+                                member.fullName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              subtitle: Text(
+                                member.institution ?? member.email,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                  child: FilledButton(
-                    onPressed: submit,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF34368C),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                    child: FilledButton(
+                      onPressed: submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF34368C),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          selectedIds.isEmpty
+                              ? 'Create chat'
+                              : 'Create with ${selectedIds.length} member${selectedIds.length == 1 ? '' : 's'}',
+                        ),
                       ),
                     ),
-                    child: Text(
-                      selectedIds.isEmpty
-                          ? 'Create chat'
-                          : 'Create with ${selectedIds.length} member${selectedIds.length == 1 ? '' : 's'}',
-                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -580,9 +593,9 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
       scrollToBottom();
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_chatError(error))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_chatError(error))));
     } finally {
       if (mounted) setState(() => sendingText = false);
     }
@@ -615,9 +628,9 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
       scrollToBottom();
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_chatError(error))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_chatError(error))));
     } finally {
       if (mounted) setState(() => sendingMedia = false);
     }
@@ -657,9 +670,9 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
         onCopy: () {
           Navigator.pop(context);
           Clipboard.setData(ClipboardData(text: message.body));
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Message copied')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Message copied')));
         },
       ),
     );
@@ -671,6 +684,7 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
       future: userFuture,
       builder: (context, userSnapshot) {
         final currentUserId = userSnapshot.data?.id;
+        final compact = MediaQuery.of(context).size.width < 360;
         return Scaffold(
           backgroundColor: const Color(0xFFEAF1F8),
           appBar: AppBar(
@@ -680,8 +694,10 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
             titleSpacing: 0,
             title: Row(
               children: [
-                const _TelegramLogoAvatar(radius: 19),
-                const SizedBox(width: 10),
+                if (!compact) ...[
+                  const _TelegramLogoAvatar(radius: 18),
+                  const SizedBox(width: 8),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -712,10 +728,11 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
               ],
             ),
             actions: [
-              IconButton(
-                onPressed: refreshMessages,
-                icon: const Icon(Icons.search_rounded),
-              ),
+              if (!compact)
+                IconButton(
+                  onPressed: refreshMessages,
+                  icon: const Icon(Icons.search_rounded),
+                ),
               IconButton(
                 onPressed: () {},
                 icon: const Icon(Icons.more_vert_rounded),
@@ -758,7 +775,8 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
                           final message = item as AppMessage;
                           return _TelegramBubble(
                             message: message,
-                            isMe: currentUserId != null &&
+                            isMe:
+                                currentUserId != null &&
                                 message.authorId == currentUserId,
                             onLongPress: () => showMessageActions(message),
                           );
@@ -1102,17 +1120,20 @@ class _TelegramBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final bubbleColor = isMe ? const Color(0xFFDDF4FF) : Colors.white;
     final mediaUrl = message.mediaUrl?.trim();
+    final screenWidth = MediaQuery.of(context).size.width;
+    final sideMargin = screenWidth < 360 ? 24.0 : 52.0;
+    final maxBubbleWidth = screenWidth - sideMargin - 24;
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
         onLongPress: onLongPress,
         child: Container(
           constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.78,
+            maxWidth: maxBubbleWidth.clamp(180.0, screenWidth * 0.78),
           ),
           margin: EdgeInsets.only(
-            left: isMe ? 52 : 0,
-            right: isMe ? 0 : 52,
+            left: isMe ? sideMargin : 0,
+            right: isMe ? 0 : sideMargin,
             bottom: 8,
           ),
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
@@ -1458,7 +1479,8 @@ Object _messageListItem(List<AppMessage> messages, int index) {
   return messages.last;
 }
 
-DateTime _dateOnly(DateTime value) => DateTime(value.year, value.month, value.day);
+DateTime _dateOnly(DateTime value) =>
+    DateTime(value.year, value.month, value.day);
 
 String _chatTime(DateTime? value) {
   if (value == null) return '';
