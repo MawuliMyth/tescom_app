@@ -149,7 +149,6 @@ class _WhatsAppListHeader extends StatelessWidget {
                 icon: Icons.arrow_back_rounded,
                 onTap: onBack,
               ),
-              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   'Chats',
@@ -163,9 +162,18 @@ class _WhatsAppListHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              _WhatsAppHeaderButton(
-                icon: Icons.add_comment_rounded,
-                onTap: onCreate,
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 40,
+                  height: 40,
+                ),
+                onPressed: onCreate,
+                icon: const Icon(
+                  Icons.add_comment_rounded,
+                  color: Colors.white,
+                ),
               ),
             ],
           ),
@@ -628,42 +636,20 @@ class _WhatsAppThreadPageState extends State<_WhatsAppThreadPage> {
             backgroundColor: const Color(0xFF34368C),
             foregroundColor: Colors.white,
             titleSpacing: 0,
-            title: Row(
-              children: [
-                const _LogoAvatar(radius: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.conversation.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                      Text(
-                        'tap for chat info',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          color: Colors.white70,
-                          fontSize: 11,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            title: Text(
+              widget.conversation.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
             ),
             actions: [
               IconButton(
+                visualDensity: VisualDensity.compact,
                 onPressed: refreshMessages,
                 icon: const Icon(Icons.more_vert_rounded),
               ),
@@ -743,85 +729,51 @@ class _WhatsAppComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width < 360;
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 46),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () {},
-                      icon: const Icon(
-                        Icons.emoji_emotions_outlined,
-                        color: Color(0xFF667781),
-                      ),
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        minLines: 1,
-                        maxLines: 4,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: InputDecoration(
-                          hintText: 'Message',
-                          hintStyle: GoogleFonts.inter(
-                            color: const Color(0xFF667781),
-                            letterSpacing: 0,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      onPressed: sendingMedia ? null : onAttach,
-                      icon: Icon(
-                        sendingMedia
-                            ? Icons.hourglass_top_rounded
-                            : Icons.attach_file_rounded,
-                        color: const Color(0xFF667781),
-                      ),
-                    ),
-                  ],
-                ),
+        padding: EdgeInsets.fromLTRB(compact ? 4 : 6, 6, compact ? 4 : 6, 8),
+        child: TextField(
+          controller: controller,
+          minLines: 1,
+          maxLines: 4,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+            hintText: 'Message',
+            hintStyle: GoogleFonts.inter(
+              color: const Color(0xFF667781),
+              letterSpacing: 0,
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(24),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
+            prefixIcon: IconButton(
+              visualDensity: VisualDensity.compact,
+              onPressed: sendingMedia ? null : onAttach,
+              icon: Icon(
+                sendingMedia
+                    ? Icons.hourglass_top_rounded
+                    : Icons.attach_file_rounded,
+                color: const Color(0xFF667781),
               ),
             ),
-            const SizedBox(width: 6),
-            InkWell(
-              onTap: sendingText ? null : onSend,
-              borderRadius: BorderRadius.circular(23),
-              child: Container(
-                width: 46,
-                height: 46,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF34368C),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  sendingText
-                      ? Icons.hourglass_top_rounded
-                      : Icons.send_rounded,
-                  color: Colors.white,
-                  size: 21,
-                ),
+            suffixIcon: IconButton(
+              visualDensity: VisualDensity.compact,
+              onPressed: sendingText ? null : onSend,
+              icon: Icon(
+                sendingText ? Icons.hourglass_top_rounded : Icons.send_rounded,
+                color: const Color(0xFF34368C),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
