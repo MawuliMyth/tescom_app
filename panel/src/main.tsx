@@ -1126,7 +1126,8 @@ function ResourceManager({ resource }: { resource: Resource }) {
           <table>
             <thead>
               <tr>
-                <th>Title / Name</th>
+                <th>{primaryColumnLabel(resource)}</th>
+                {resource.key === "executives" && <th>Position</th>}
                 <th>Status</th>
                 <th>Updated</th>
                 <th></th>
@@ -1144,6 +1145,9 @@ function ResourceManager({ resource }: { resource: Resource }) {
                       </div>
                     </div>
                   </td>
+                  {resource.key === "executives" && (
+                    <td>{row.organizationRole ? <StatusPill value={row.organizationRole} /> : "No position"}</td>
+                  )}
                   <td><StatusPill value={row.status ?? (row.resolved ? "Resolved" : "Open")} /></td>
                   <td>{formatDate(row.updatedAt ?? row.createdAt)}</td>
                   <td className="row-actions">
@@ -1154,7 +1158,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
               ))}
               {!filteredRows.length && (
                 <tr>
-                  <td colSpan={4} className="empty">
+                  <td colSpan={resource.key === "executives" ? 5 : 4} className="empty">
                     <EmptyState
                       title={query ? "No matching records" : "No records yet"}
                       message={query ? "Try a different search term or clear the search box." : `Use ${resourceActionLabel(resource).toLowerCase()} when you are ready to create live data.`}
@@ -1219,6 +1223,24 @@ function SaveIcon() {
   return <UploadCloud size={16} />;
 }
 
+function primaryColumnLabel(resource: Resource) {
+  const labels: Partial<Record<ResourceKey, string>> = {
+    users: "Member",
+    executives: "Executive",
+    chapters: "Chapter",
+    news: "News title",
+    events: "Event title",
+    announcements: "Announcement",
+    jobs: "Job title",
+    jobApplications: "Applicant",
+    polls: "Poll question",
+    conversations: "Chat room",
+    notifications: "Notification",
+    contacts: "Contact"
+  };
+  return labels[resource.key] ?? "Record";
+}
+
 function resourceActionLabel(resource: Resource) {
   const labels: Partial<Record<ResourceKey, string>> = {
     users: "Add Member",
@@ -1243,6 +1265,7 @@ function recordTitle(row: AdminRecord) {
 
 function recordSubtitle(row: AdminRecord) {
   if (row.job?.title) return `${row.job.title}${row.institution ? ` - ${row.institution}` : ""}`;
+  if (row.organizationRole && row.email) return `${row.organizationRole} - ${row.email}`;
   return row.summary ?? row.description ?? row.email ?? row.company ?? row.institution ?? row.organizationRole ?? row.body ?? "";
 }
 

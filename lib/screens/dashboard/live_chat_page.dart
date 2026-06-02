@@ -24,13 +24,14 @@ class _LiveChatPageState extends State<_LiveChatPage> {
   }
 
   Future<void> createConversation() async {
-    final draft = await showModalBottomSheet<_CreateChatDraft>(
+    final draft = await showModalBottomSheet<_ChatDraft>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const _CreateChatSheet(),
     );
     if (draft == null || draft.title.trim().isEmpty) return;
+
     try {
       final conversation = await AppRepository().createConversation(
         title: draft.title.trim(),
@@ -42,7 +43,7 @@ class _LiveChatPageState extends State<_LiveChatPage> {
         context,
         _adaptivePageRoute(
           context,
-          builder: (_) => _TelegramThreadPage(conversation: conversation),
+          builder: (_) => _WhatsAppThreadPage(conversation: conversation),
         ),
       );
     } catch (error) {
@@ -56,7 +57,7 @@ class _LiveChatPageState extends State<_LiveChatPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: const Color(0xFFF3F6F8),
       body: SafeArea(
         bottom: false,
         child: FutureBuilder<List<AppConversation>>(
@@ -73,7 +74,8 @@ class _LiveChatPageState extends State<_LiveChatPage> {
             final conversations = (snapshot.data ?? const []).where((
               conversation,
             ) {
-              final text = query.toLowerCase();
+              final text = query.trim().toLowerCase();
+              if (text.isEmpty) return true;
               return conversation.title.toLowerCase().contains(text) ||
                   _latestMessagePreview(
                     conversation.latestMessage,
@@ -86,7 +88,7 @@ class _LiveChatPageState extends State<_LiveChatPage> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverToBoxAdapter(
-                    child: _TelegramChatHeader(
+                    child: _WhatsAppListHeader(
                       query: query,
                       onBack: () => Navigator.pop(context),
                       onCreate: createConversation,
@@ -98,22 +100,17 @@ class _LiveChatPageState extends State<_LiveChatPage> {
                       hasScrollBody: false,
                       child: _ChatEmptyState(
                         title: 'No chats yet',
-                        message:
-                            'Start a chat and invite members from the TESCON directory.',
+                        message: 'Create a chat and invite TESCON members.',
                       ),
                     )
                   else
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 22),
-                      sliver: SliverList.separated(
-                        itemCount: conversations.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 2),
-                        itemBuilder: (context, index) {
-                          return _TelegramConversationTile(
-                            conversation: conversations[index],
-                          );
-                        },
-                      ),
+                    SliverList.builder(
+                      itemCount: conversations.length,
+                      itemBuilder: (context, index) {
+                        return _WhatsAppConversationTile(
+                          conversation: conversations[index],
+                        );
+                      },
                     ),
                 ],
               ),
@@ -125,8 +122,8 @@ class _LiveChatPageState extends State<_LiveChatPage> {
   }
 }
 
-class _TelegramChatHeader extends StatelessWidget {
-  const _TelegramChatHeader({
+class _WhatsAppListHeader extends StatelessWidget {
+  const _WhatsAppListHeader({
     required this.query,
     required this.onBack,
     required this.onCreate,
@@ -142,64 +139,56 @@ class _TelegramChatHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = MediaQuery.of(context).size.width < 360;
     return Container(
-      padding: EdgeInsets.fromLTRB(compact ? 10 : 14, 8, compact ? 10 : 14, 14),
-      decoration: const BoxDecoration(
-        color: Color(0xFF34368C),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
-      ),
+      color: const Color(0xFF075E54),
+      padding: EdgeInsets.fromLTRB(compact ? 8 : 12, 8, compact ? 8 : 12, 14),
       child: Column(
         children: [
           Row(
             children: [
-              _TelegramHeaderButton(
+              _WhatsAppHeaderButton(
                 icon: Icons.arrow_back_rounded,
                 onTap: onBack,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  compact ? 'Chats' : 'Telegram Chat',
+                  'Chats',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
                     color: Colors.white,
-                    fontSize: compact ? 20 : 22,
+                    fontSize: compact ? 22 : 25,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0,
                   ),
                 ),
               ),
-              _TelegramHeaderButton(icon: Icons.edit_square, onTap: onCreate),
+              _WhatsAppHeaderButton(
+                icon: Icons.add_comment_rounded,
+                onTap: onCreate,
+              ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           TextField(
             onChanged: onQueryChanged,
-            style: GoogleFonts.inter(color: Colors.white, letterSpacing: 0),
+            style: GoogleFonts.inter(color: Colors.black, letterSpacing: 0),
             decoration: InputDecoration(
-              hintText: 'Search messages or chats',
-              hintStyle: GoogleFonts.inter(
-                color: Colors.white70,
-                fontSize: 13,
-                letterSpacing: 0,
-              ),
-              prefixIcon: const Icon(Icons.search_rounded, color: Colors.white),
+              hintText: 'Search chats',
+              prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: query.isEmpty
                   ? null
                   : IconButton(
                       onPressed: () => onQueryChanged(''),
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: Colors.white,
-                      ),
+                      icon: const Icon(Icons.close_rounded),
                     ),
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.16),
+              fillColor: Colors.white,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(24),
                 borderSide: BorderSide.none,
               ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(vertical: 0),
             ),
           ),
         ],
@@ -208,33 +197,24 @@ class _TelegramChatHeader extends StatelessWidget {
   }
 }
 
-class _TelegramHeaderButton extends StatelessWidget {
-  const _TelegramHeaderButton({required this.icon, required this.onTap});
+class _WhatsAppHeaderButton extends StatelessWidget {
+  const _WhatsAppHeaderButton({required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.of(context).size.width < 360;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        width: compact ? 36 : 40,
-        height: compact ? 36 : 40,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.14),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: Colors.white, size: 20),
-      ),
+    return IconButton(
+      visualDensity: VisualDensity.compact,
+      onPressed: onTap,
+      icon: Icon(icon, color: Colors.white),
     );
   }
 }
 
-class _CreateChatDraft {
-  const _CreateChatDraft({required this.title, required this.participantIds});
+class _ChatDraft {
+  const _ChatDraft({required this.title, required this.participantIds});
 
   final String title;
   final List<String> participantIds;
@@ -267,7 +247,7 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
   void submit() {
     Navigator.pop(
       context,
-      _CreateChatDraft(
+      _ChatDraft(
         title: controller.text,
         participantIds: selectedIds.toList(growable: false),
       ),
@@ -276,7 +256,7 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final sheetHeight = MediaQuery.of(context).size.height * 0.88;
+    final height = MediaQuery.of(context).size.height * 0.86;
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -284,19 +264,18 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
       child: Material(
         color: Colors.transparent,
         child: SizedBox(
-          height: sheetHeight,
+          height: height,
           child: Container(
             decoration: const BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
             ),
             child: SafeArea(
               top: false,
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                    padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -310,9 +289,9 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 16),
                         Text(
-                          'New group chat',
+                          'New chat',
                           style: GoogleFonts.inter(
                             color: Colors.black,
                             fontSize: 19,
@@ -325,7 +304,7 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
                           controller: controller,
                           autofocus: true,
                           decoration: InputDecoration(
-                            hintText: 'Group or chat title',
+                            hintText: 'Chat title',
                             prefixIcon: const Icon(Icons.group_rounded),
                             filled: true,
                             fillColor: const Color(0xFFF4F7FB),
@@ -345,7 +324,7 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
                           return const Padding(
-                            padding: EdgeInsets.all(20),
+                            padding: EdgeInsets.all(18),
                             child: _ListShimmer(itemCount: 4),
                           );
                         }
@@ -353,12 +332,10 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
                         if (members.isEmpty) {
                           return const _ChatEmptyState(
                             title: 'No members available',
-                            message:
-                                'Members will appear here when they register.',
+                            message: 'Members will appear here when they join.',
                           );
                         }
                         return ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
                           itemCount: members.length,
                           itemBuilder: (context, index) {
                             final member = members[index];
@@ -372,8 +349,8 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
                                       : selectedIds.add(member.id);
                                 });
                               },
-                              activeColor: const Color(0xFF34368C),
-                              secondary: _TelegramAvatar(user: member),
+                              activeColor: const Color(0xFF25D366),
+                              secondary: _ChatAvatar(user: member),
                               title: Text(
                                 member.fullName,
                                 maxLines: 1,
@@ -395,11 +372,11 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                    padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
                     child: FilledButton(
                       onPressed: submit,
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF34368C),
+                        backgroundColor: const Color(0xFF075E54),
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 52),
                         shape: RoundedRectangleBorder(
@@ -426,8 +403,8 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
   }
 }
 
-class _TelegramConversationTile extends StatelessWidget {
-  const _TelegramConversationTile({required this.conversation});
+class _WhatsAppConversationTile extends StatelessWidget {
+  const _WhatsAppConversationTile({required this.conversation});
 
   final AppConversation conversation;
 
@@ -439,78 +416,69 @@ class _TelegramConversationTile extends StatelessWidget {
         context,
         _adaptivePageRoute(
           context,
-          builder: (_) => _TelegramThreadPage(conversation: conversation),
+          builder: (_) => _WhatsAppThreadPage(conversation: conversation),
         ),
       ),
-      borderRadius: BorderRadius.circular(18),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-        ),
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Row(
           children: [
-            const _TelegramLogoAvatar(radius: 28),
+            const _LogoAvatar(radius: 27),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xFFE7EAEE))),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          conversation.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            color: Colors.black,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              conversation.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _chatTime(
+                              latest?.createdAt ?? conversation.updatedAt,
+                            ),
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF8A94A6),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 4),
                       Text(
-                        _chatTime(latest?.createdAt ?? conversation.updatedAt),
+                        _latestMessagePreview(latest),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
-                          color: const Color(0xFF8A94A6),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF657184),
+                          fontSize: 13,
                           letterSpacing: 0,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _latestMessagePreview(latest),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            color: const Color(0xFF657184),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                      ),
-                      if (latest != null)
-                        Container(
-                          width: 9,
-                          height: 9,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF34368C),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ),
           ],
@@ -520,21 +488,20 @@ class _TelegramConversationTile extends StatelessWidget {
   }
 }
 
-class _TelegramThreadPage extends StatefulWidget {
-  const _TelegramThreadPage({required this.conversation});
+class _WhatsAppThreadPage extends StatefulWidget {
+  const _WhatsAppThreadPage({required this.conversation});
 
   final AppConversation conversation;
 
   @override
-  State<_TelegramThreadPage> createState() => _TelegramThreadPageState();
+  State<_WhatsAppThreadPage> createState() => _WhatsAppThreadPageState();
 }
 
-class _TelegramThreadPageState extends State<_TelegramThreadPage> {
+class _WhatsAppThreadPageState extends State<_WhatsAppThreadPage> {
   final controller = TextEditingController();
   final scrollController = ScrollController();
   late Future<List<AppMessage>> messagesFuture;
   late Future<AppUser?> userFuture;
-  AppMessage? replyTo;
   bool sendingText = false;
   bool sendingMedia = false;
 
@@ -565,29 +532,19 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
   void scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!scrollController.hasClients) return;
-      scrollController.animateTo(
-        scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-      );
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
     });
   }
 
-  Future<void> send() async {
+  Future<void> sendText() async {
     final text = controller.text.trim();
     if (text.isEmpty || sendingText) return;
     controller.clear();
-    final body = replyTo == null
-        ? text
-        : '↪ ${replyTo!.author?.fullName ?? 'Member'}: ${_latestMessagePreview(replyTo)}\n$text';
-    setState(() {
-      sendingText = true;
-      replyTo = null;
-    });
+    setState(() => sendingText = true);
     try {
       await AppRepository().sendConversationMessage(
         conversationId: widget.conversation.id,
-        body: body,
+        body: text,
       );
       await refreshMessages();
       scrollToBottom();
@@ -601,7 +558,10 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
     }
   }
 
-  Future<void> sendMedia(ImageSource source, {required bool video}) async {
+  Future<void> sendMedia({
+    required bool video,
+    required ImageSource source,
+  }) async {
     if (sendingMedia) return;
     final picker = ImagePicker();
     final picked = video
@@ -611,12 +571,10 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
 
     setState(() => sendingMedia = true);
     try {
-      final bytes = await picked.readAsBytes();
-      final mediaType = picked.mimeType ?? (video ? 'video/mp4' : 'image/jpeg');
       final uploaded = await AppRepository().uploadChatMedia(
         filename: picked.name,
-        bytes: bytes,
-        contentType: mediaType,
+        bytes: await picked.readAsBytes(),
+        contentType: picked.mimeType ?? (video ? 'video/mp4' : 'image/jpeg'),
       );
       await AppRepository().sendConversationMessage(
         conversationId: widget.conversation.id,
@@ -636,43 +594,23 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
     }
   }
 
-  Future<void> showAttachmentSheet() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _TelegramAttachmentSheet(
-        uploading: sendingMedia,
-        onPhoto: () {
-          Navigator.pop(context);
-          sendMedia(ImageSource.gallery, video: false);
-        },
-        onCamera: () {
-          Navigator.pop(context);
-          sendMedia(ImageSource.camera, video: false);
-        },
-        onVideo: () {
-          Navigator.pop(context);
-          sendMedia(ImageSource.gallery, video: true);
-        },
-      ),
-    );
-  }
-
-  void showMessageActions(AppMessage message) {
+  void showAttachmentSheet() {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _TelegramMessageActions(
-        onReply: () {
+      builder: (_) => _AttachmentSheet(
+        uploading: sendingMedia,
+        onImage: () {
           Navigator.pop(context);
-          setState(() => replyTo = message);
+          sendMedia(video: false, source: ImageSource.gallery);
         },
-        onCopy: () {
+        onCamera: () {
           Navigator.pop(context);
-          Clipboard.setData(ClipboardData(text: message.body));
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Message copied')));
+          sendMedia(video: false, source: ImageSource.camera);
+        },
+        onVideo: () {
+          Navigator.pop(context);
+          sendMedia(video: true, source: ImageSource.gallery);
         },
       ),
     );
@@ -684,20 +622,16 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
       future: userFuture,
       builder: (context, userSnapshot) {
         final currentUserId = userSnapshot.data?.id;
-        final compact = MediaQuery.of(context).size.width < 360;
         return Scaffold(
-          backgroundColor: const Color(0xFFEAF1F8),
+          backgroundColor: const Color(0xFFECE5DD),
           appBar: AppBar(
-            backgroundColor: const Color(0xFF34368C),
+            backgroundColor: const Color(0xFF075E54),
             foregroundColor: Colors.white,
-            elevation: 0,
             titleSpacing: 0,
             title: Row(
               children: [
-                if (!compact) ...[
-                  const _TelegramLogoAvatar(radius: 18),
-                  const SizedBox(width: 8),
-                ],
+                const _LogoAvatar(radius: 18),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -714,11 +648,12 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
                         ),
                       ),
                       Text(
-                        'online recently',
+                        'tap for chat info',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
                           color: Colors.white70,
                           fontSize: 11,
-                          fontWeight: FontWeight.w600,
                           letterSpacing: 0,
                         ),
                       ),
@@ -728,13 +663,8 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
               ],
             ),
             actions: [
-              if (!compact)
-                IconButton(
-                  onPressed: refreshMessages,
-                  icon: const Icon(Icons.search_rounded),
-                ),
               IconButton(
-                onPressed: () {},
+                onPressed: refreshMessages,
                 icon: const Icon(Icons.more_vert_rounded),
               ),
             ],
@@ -748,7 +678,7 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Padding(
                         padding: EdgeInsets.fromLTRB(18, 16, 18, 8),
-                        child: _ListShimmer(itemCount: 7),
+                        child: _ListShimmer(itemCount: 6),
                       );
                     }
                     if (snapshot.hasError) return const _InlineErrorState();
@@ -765,20 +695,15 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
                       child: ListView.builder(
                         controller: scrollController,
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(10, 12, 10, 8),
-                        itemCount: _messageListLength(messages),
+                        padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+                        itemCount: messages.length,
                         itemBuilder: (context, index) {
-                          final item = _messageListItem(messages, index);
-                          if (item is DateTime) {
-                            return _TelegramDateDivider(date: item);
-                          }
-                          final message = item as AppMessage;
-                          return _TelegramBubble(
+                          final message = messages[index];
+                          return _MessageBubble(
                             message: message,
                             isMe:
                                 currentUserId != null &&
                                 message.authorId == currentUserId,
-                            onLongPress: () => showMessageActions(message),
                           );
                         },
                       ),
@@ -786,14 +711,12 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
                   },
                 ),
               ),
-              _TelegramComposer(
+              _WhatsAppComposer(
                 controller: controller,
-                replyTo: replyTo,
                 sendingText: sendingText,
                 sendingMedia: sendingMedia,
-                onCancelReply: () => setState(() => replyTo = null),
                 onAttach: showAttachmentSheet,
-                onSend: send,
+                onSend: sendText,
               ),
             ],
           ),
@@ -803,154 +726,100 @@ class _TelegramThreadPageState extends State<_TelegramThreadPage> {
   }
 }
 
-class _TelegramComposer extends StatelessWidget {
-  const _TelegramComposer({
+class _WhatsAppComposer extends StatelessWidget {
+  const _WhatsAppComposer({
     required this.controller,
-    required this.replyTo,
     required this.sendingText,
     required this.sendingMedia,
-    required this.onCancelReply,
     required this.onAttach,
     required this.onSend,
   });
 
   final TextEditingController controller;
-  final AppMessage? replyTo;
   final bool sendingText;
   final bool sendingMedia;
-  final VoidCallback onCancelReply;
   final VoidCallback onAttach;
   final VoidCallback onSend;
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.of(context).size.width < 360;
     return SafeArea(
       top: false,
-      child: Container(
-        padding: EdgeInsets.fromLTRB(compact ? 6 : 8, 6, compact ? 6 : 8, 8),
-        color: const Color(0xFFEAF1F8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            if (replyTo != null)
-              Container(
-                margin: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-                padding: const EdgeInsets.all(10),
+            Expanded(
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 46),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: const Border(
-                    left: BorderSide(color: Color(0xFF34368C), width: 4),
-                  ),
+                  borderRadius: BorderRadius.circular(24),
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () {},
+                      icon: const Icon(
+                        Icons.emoji_emotions_outlined,
+                        color: Color(0xFF667781),
+                      ),
+                    ),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Reply to ${replyTo!.author?.fullName ?? 'Member'}',
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFF34368C),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0,
-                            ),
+                      child: TextField(
+                        controller: controller,
+                        minLines: 1,
+                        maxLines: 4,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: InputDecoration(
+                          hintText: 'Message',
+                          hintStyle: GoogleFonts.inter(
+                            color: const Color(0xFF667781),
+                            letterSpacing: 0,
                           ),
-                          Text(
-                            _latestMessagePreview(replyTo),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFF657184),
-                              fontSize: 12,
-                              letterSpacing: 0,
-                            ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12,
                           ),
-                        ],
+                        ),
                       ),
                     ),
                     IconButton(
-                      onPressed: onCancelReply,
-                      icon: const Icon(Icons.close_rounded),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: sendingMedia ? null : onAttach,
+                      icon: Icon(
+                        sendingMedia
+                            ? Icons.hourglass_top_rounded
+                            : Icons.attach_file_rounded,
+                        color: const Color(0xFF667781),
+                      ),
                     ),
                   ],
                 ),
               ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (!compact)
-                          IconButton(
-                            onPressed: () {},
-                            icon: const Icon(
-                              Icons.emoji_emotions_outlined,
-                              color: Color(0xFF778397),
-                            ),
-                          ),
-                        Expanded(
-                          child: TextField(
-                            controller: controller,
-                            minLines: 1,
-                            maxLines: 5,
-                            textCapitalization: TextCapitalization.sentences,
-                            decoration: InputDecoration(
-                              hintText: 'Message',
-                              hintStyle: GoogleFonts.inter(
-                                color: const Color(0xFF8A94A6),
-                                letterSpacing: 0,
-                              ),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: sendingMedia ? null : onAttach,
-                          icon: Icon(
-                            sendingMedia
-                                ? Icons.hourglass_top_rounded
-                                : Icons.attach_file_rounded,
-                            color: const Color(0xFF778397),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+            ),
+            const SizedBox(width: 6),
+            InkWell(
+              onTap: sendingText ? null : onSend,
+              borderRadius: BorderRadius.circular(23),
+              child: Container(
+                width: 46,
+                height: 46,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF25D366),
+                  shape: BoxShape.circle,
                 ),
-                SizedBox(width: compact ? 6 : 8),
-                InkWell(
-                  onTap: sendingText ? null : onSend,
-                  borderRadius: BorderRadius.circular(24),
-                  child: Container(
-                    width: compact ? 44 : 48,
-                    height: compact ? 44 : 48,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF34368C),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      sendingText
-                          ? Icons.hourglass_top_rounded
-                          : Icons.send_rounded,
-                      color: Colors.white,
-                    ),
-                  ),
+                child: Icon(
+                  sendingText
+                      ? Icons.hourglass_top_rounded
+                      : Icons.send_rounded,
+                  color: Colors.white,
+                  size: 21,
                 ),
-              ],
+              ),
             ),
           ],
         ),
@@ -959,16 +828,16 @@ class _TelegramComposer extends StatelessWidget {
   }
 }
 
-class _TelegramAttachmentSheet extends StatelessWidget {
-  const _TelegramAttachmentSheet({
+class _AttachmentSheet extends StatelessWidget {
+  const _AttachmentSheet({
     required this.uploading,
-    required this.onPhoto,
+    required this.onImage,
     required this.onCamera,
     required this.onVideo,
   });
 
   final bool uploading;
-  final VoidCallback onPhoto;
+  final VoidCallback onImage;
   final VoidCallback onCamera;
   final VoidCallback onVideo;
 
@@ -977,38 +846,34 @@ class _TelegramAttachmentSheet extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 26),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: SafeArea(
           top: false,
-          child: Row(
+          child: Wrap(
+            alignment: WrapAlignment.spaceAround,
+            runSpacing: 12,
             children: [
-              Expanded(
-                child: _AttachmentAction(
-                  icon: Icons.photo_library_rounded,
-                  label: 'Gallery',
-                  color: const Color(0xFF35A7FF),
-                  onTap: uploading ? null : onPhoto,
-                ),
+              _AttachmentAction(
+                icon: Icons.photo_library_rounded,
+                label: 'Gallery',
+                color: const Color(0xFF35A7FF),
+                onTap: uploading ? null : onImage,
               ),
-              Expanded(
-                child: _AttachmentAction(
-                  icon: Icons.camera_alt_rounded,
-                  label: 'Camera',
-                  color: const Color(0xFF32C770),
-                  onTap: uploading ? null : onCamera,
-                ),
+              _AttachmentAction(
+                icon: Icons.camera_alt_rounded,
+                label: 'Camera',
+                color: const Color(0xFF32C770),
+                onTap: uploading ? null : onCamera,
               ),
-              Expanded(
-                child: _AttachmentAction(
-                  icon: Icons.videocam_rounded,
-                  label: 'Video',
-                  color: const Color(0xFFE84D8A),
-                  onTap: uploading ? null : onVideo,
-                ),
+              _AttachmentAction(
+                icon: Icons.videocam_rounded,
+                label: 'Video',
+                color: const Color(0xFFE84D8A),
+                onTap: uploading ? null : onVideo,
               ),
             ],
           ),
@@ -1033,69 +898,33 @@ class _AttachmentAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              child: Icon(icon, color: Colors.white, size: 28),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                color: const Color(0xFF657184),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TelegramMessageActions extends StatelessWidget {
-  const _TelegramMessageActions({required this.onReply, required this.onCopy});
-
-  final VoidCallback onReply;
-  final VoidCallback onCopy;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SafeArea(
-          top: false,
+    return SizedBox(
+      width: 86,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: const Icon(Icons.reply_rounded),
-                title: const Text('Reply'),
-                onTap: onReply,
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                child: Icon(icon, color: Colors.white, size: 27),
               ),
-              ListTile(
-                leading: const Icon(Icons.copy_rounded),
-                title: const Text('Copy text'),
-                onTap: onCopy,
+              const SizedBox(height: 8),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF657184),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
               ),
             ],
           ),
@@ -1105,175 +934,148 @@ class _TelegramMessageActions extends StatelessWidget {
   }
 }
 
-class _TelegramBubble extends StatelessWidget {
-  const _TelegramBubble({
-    required this.message,
-    required this.isMe,
-    required this.onLongPress,
-  });
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({required this.message, required this.isMe});
 
   final AppMessage message;
   final bool isMe;
-  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
-    final bubbleColor = isMe ? const Color(0xFFDDF4FF) : Colors.white;
     final mediaUrl = message.mediaUrl?.trim();
-    final screenWidth = MediaQuery.of(context).size.width;
-    final sideMargin = screenWidth < 360 ? 24.0 : 52.0;
-    final maxBubbleWidth = screenWidth - sideMargin - 24;
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: GestureDetector(
-        onLongPress: onLongPress,
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: maxBubbleWidth.clamp(180.0, screenWidth * 0.78),
-          ),
-          margin: EdgeInsets.only(
-            left: isMe ? sideMargin : 0,
-            right: isMe ? 0 : sideMargin,
-            bottom: 8,
-          ),
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
-          decoration: BoxDecoration(
-            color: bubbleColor,
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(18),
-              topRight: const Radius.circular(18),
-              bottomLeft: Radius.circular(isMe ? 18 : 5),
-              bottomRight: Radius.circular(isMe ? 5 : 18),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth * 0.76;
+          return Container(
+            constraints: BoxConstraints(maxWidth: width.clamp(190.0, 330.0)),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.fromLTRB(9, 7, 9, 5),
+            decoration: BoxDecoration(
+              color: isMe ? const Color(0xFFDCF8C6) : Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(14),
+                topRight: const Radius.circular(14),
+                bottomLeft: Radius.circular(isMe ? 14 : 3),
+                bottomRight: Radius.circular(isMe ? 3 : 14),
               ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (!isMe)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Text(
-                    message.author?.fullName ?? 'Member',
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!isMe)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: Text(
+                      message.author?.fullName ?? 'Member',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF075E54),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ),
+                if (mediaUrl != null && mediaUrl.isNotEmpty)
+                  _BubbleMedia(message: message),
+                if (message.body.trim().isNotEmpty) ...[
+                  if (mediaUrl != null && mediaUrl.isNotEmpty)
+                    const SizedBox(height: 7),
+                  Text(
+                    message.body,
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF34368C),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
+                      color: Colors.black,
+                      fontSize: 14,
+                      height: 1.3,
                       letterSpacing: 0,
                     ),
                   ),
-                ),
-              if (mediaUrl != null && mediaUrl.isNotEmpty)
-                _TelegramMediaPreview(message: message),
-              if (message.body.trim().isNotEmpty) ...[
-                if (mediaUrl != null && mediaUrl.isNotEmpty)
-                  const SizedBox(height: 8),
-                Text(
-                  message.body,
-                  style: GoogleFonts.inter(
-                    color: Colors.black,
-                    fontSize: 14,
-                    height: 1.35,
-                    letterSpacing: 0,
+                ],
+                const SizedBox(height: 3),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _chatTime(message.createdAt),
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFF667781),
+                          fontSize: 10,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      if (isMe) ...[
+                        const SizedBox(width: 3),
+                        const Icon(
+                          Icons.done_all_rounded,
+                          size: 15,
+                          color: Color(0xFF34B7F1),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],
-              const SizedBox(height: 3),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _chatTime(message.createdAt),
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFF7A8495),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  if (isMe) ...[
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.done_all_rounded,
-                      color: Color(0xFF2AABEE),
-                      size: 15,
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
 }
 
-class _TelegramMediaPreview extends StatelessWidget {
-  const _TelegramMediaPreview({required this.message});
+class _BubbleMedia extends StatelessWidget {
+  const _BubbleMedia({required this.message});
 
   final AppMessage message;
 
   @override
   Widget build(BuildContext context) {
-    final mediaUrl = message.mediaUrl ?? '';
     final isVideo = message.mediaType?.contains('video') == true;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth.isFinite
-            ? constraints.maxWidth
-            : MediaQuery.of(context).size.width * 0.68;
-        final width = maxWidth < 240 ? maxWidth : 240.0;
-        final imageHeight = width * 0.7;
-        final videoHeight = width * 0.62;
-
+        final width = constraints.maxWidth;
+        final height = width * 0.66;
         if (isVideo) {
           return Container(
             width: width,
-            height: videoHeight,
+            height: height,
             decoration: BoxDecoration(
               color: const Color(0xFF1F2937),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: const Center(
               child: Icon(
                 Icons.play_circle_fill_rounded,
                 color: Colors.white,
-                size: 54,
+                size: 48,
               ),
             ),
           );
         }
         return ClipRRect(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           child: CachedNetworkImage(
-            imageUrl: ApiConfig.mediaUrl(mediaUrl),
+            imageUrl: ApiConfig.mediaUrl(message.mediaUrl ?? ''),
             width: width,
-            height: imageHeight,
+            height: height,
             fit: BoxFit.cover,
-            placeholder: (_, _) => _ShimmerBlock(
-              width: width,
-              height: imageHeight,
-              borderRadius: 14,
-            ),
+            placeholder: (_, _) =>
+                _ShimmerBlock(width: width, height: height, borderRadius: 10),
             errorWidget: (_, _, _) => Container(
               width: width,
-              height: width * 0.48,
+              height: height,
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFEFFC),
-                borderRadius: BorderRadius.circular(14),
-              ),
+              color: const Color(0xFFEFEFFC),
               child: Text(
                 'Image unavailable',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF34368C),
+                  color: const Color(0xFF075E54),
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0,
@@ -1287,37 +1089,8 @@ class _TelegramMediaPreview extends StatelessWidget {
   }
 }
 
-class _TelegramDateDivider extends StatelessWidget {
-  const _TelegramDateDivider({required this.date});
-
-  final DateTime date;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10, top: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(
-          color: const Color(0xFFB8C7DA).withValues(alpha: 0.56),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          _chatDateLabel(date),
-          style: GoogleFonts.inter(
-            color: Colors.white,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TelegramLogoAvatar extends StatelessWidget {
-  const _TelegramLogoAvatar({required this.radius});
+class _LogoAvatar extends StatelessWidget {
+  const _LogoAvatar({required this.radius});
 
   final double radius;
 
@@ -1338,8 +1111,8 @@ class _TelegramLogoAvatar extends StatelessWidget {
   }
 }
 
-class _TelegramAvatar extends StatelessWidget {
-  const _TelegramAvatar({required this.user});
+class _ChatAvatar extends StatelessWidget {
+  const _ChatAvatar({required this.user});
 
   final AppUser user;
 
@@ -1361,7 +1134,7 @@ class _TelegramAvatar extends StatelessWidget {
       );
     }
     return CircleAvatar(
-      backgroundColor: const Color(0xFF34368C),
+      backgroundColor: const Color(0xFF075E54),
       child: Text(
         _initials(user.fullName),
         style: GoogleFonts.inter(
@@ -1389,16 +1162,16 @@ class _ChatEmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 76,
-              height: 76,
+              width: 72,
+              height: 72,
               decoration: const BoxDecoration(
-                color: Color(0xFFE3F2FD),
+                color: Color(0xFFE0F5EA),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.forum_rounded,
-                color: Color(0xFF2AABEE),
-                size: 34,
+                Icons.chat_rounded,
+                color: Color(0xFF075E54),
+                size: 32,
               ),
             ),
             const SizedBox(height: 14),
@@ -1449,54 +1222,12 @@ String _latestMessagePreview(AppMessage? message) {
   return 'No messages yet';
 }
 
-int _messageListLength(List<AppMessage> messages) {
-  var length = 0;
-  DateTime? lastDate;
-  for (final message in messages) {
-    final date = _dateOnly(message.createdAt ?? DateTime.now());
-    if (lastDate == null || date != lastDate) {
-      length++;
-      lastDate = date;
-    }
-    length++;
-  }
-  return length;
-}
-
-Object _messageListItem(List<AppMessage> messages, int index) {
-  var cursor = 0;
-  DateTime? lastDate;
-  for (final message in messages) {
-    final date = _dateOnly(message.createdAt ?? DateTime.now());
-    if (lastDate == null || date != lastDate) {
-      if (cursor == index) return date;
-      cursor++;
-      lastDate = date;
-    }
-    if (cursor == index) return message;
-    cursor++;
-  }
-  return messages.last;
-}
-
-DateTime _dateOnly(DateTime value) =>
-    DateTime(value.year, value.month, value.day);
-
 String _chatTime(DateTime? value) {
   if (value == null) return '';
   final local = value.toLocal();
   final hour = local.hour.toString().padLeft(2, '0');
   final minute = local.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
-}
-
-String _chatDateLabel(DateTime value) {
-  final now = DateTime.now();
-  final today = _dateOnly(now);
-  final date = _dateOnly(value.toLocal());
-  if (date == today) return 'Today';
-  if (date == today.subtract(const Duration(days: 1))) return 'Yesterday';
-  return '${date.day}/${date.month}/${date.year}';
 }
 
 String _initials(String value) {
