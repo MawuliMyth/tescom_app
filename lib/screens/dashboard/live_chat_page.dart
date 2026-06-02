@@ -139,7 +139,7 @@ class _WhatsAppListHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = MediaQuery.of(context).size.width < 360;
     return Container(
-      color: const Color(0xFF075E54),
+      color: const Color(0xFF34368C),
       padding: EdgeInsets.fromLTRB(compact ? 8 : 12, 8, compact ? 8 : 12, 14),
       child: Column(
         children: [
@@ -349,7 +349,7 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
                                       : selectedIds.add(member.id);
                                 });
                               },
-                              activeColor: const Color(0xFF25D366),
+                              activeColor: const Color(0xFF34368C),
                               secondary: _ChatAvatar(user: member),
                               title: Text(
                                 member.fullName,
@@ -376,7 +376,7 @@ class _CreateChatSheetState extends State<_CreateChatSheet> {
                     child: FilledButton(
                       onPressed: submit,
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF075E54),
+                        backgroundColor: const Color(0xFF34368C),
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 52),
                         shape: RoundedRectangleBorder(
@@ -623,9 +623,9 @@ class _WhatsAppThreadPageState extends State<_WhatsAppThreadPage> {
       builder: (context, userSnapshot) {
         final currentUserId = userSnapshot.data?.id;
         return Scaffold(
-          backgroundColor: const Color(0xFFECE5DD),
+          backgroundColor: const Color(0xFFF1F2FF),
           appBar: AppBar(
-            backgroundColor: const Color(0xFF075E54),
+            backgroundColor: const Color(0xFF34368C),
             foregroundColor: Colors.white,
             titleSpacing: 0,
             title: Row(
@@ -809,7 +809,7 @@ class _WhatsAppComposer extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: const BoxDecoration(
-                  color: Color(0xFF25D366),
+                  color: Color(0xFF34368C),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -953,7 +953,7 @@ class _MessageBubble extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.fromLTRB(9, 7, 9, 5),
             decoration: BoxDecoration(
-              color: isMe ? const Color(0xFFDCF8C6) : Colors.white,
+              color: isMe ? const Color(0xFFE8ECFF) : Colors.white,
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(14),
                 topRight: const Radius.circular(14),
@@ -973,7 +973,7 @@ class _MessageBubble extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF075E54),
+                        color: const Color(0xFF34368C),
                         fontSize: 11,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0,
@@ -1014,7 +1014,7 @@ class _MessageBubble extends StatelessWidget {
                         const Icon(
                           Icons.done_all_rounded,
                           size: 15,
-                          color: Color(0xFF34B7F1),
+                          color: Color(0xFF34368C),
                         ),
                       ],
                     ],
@@ -1075,7 +1075,7 @@ class _BubbleMedia extends StatelessWidget {
               child: Text(
                 'Image unavailable',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF075E54),
+                  color: const Color(0xFF34368C),
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0,
@@ -1134,7 +1134,7 @@ class _ChatAvatar extends StatelessWidget {
       );
     }
     return CircleAvatar(
-      backgroundColor: const Color(0xFF075E54),
+      backgroundColor: const Color(0xFF34368C),
       child: Text(
         _initials(user.fullName),
         style: GoogleFonts.inter(
@@ -1165,12 +1165,12 @@ class _ChatEmptyState extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: const BoxDecoration(
-                color: Color(0xFFE0F5EA),
+                color: Color(0xFFE8ECFF),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.chat_rounded,
-                color: Color(0xFF075E54),
+                color: Color(0xFF34368C),
                 size: 32,
               ),
             ),
