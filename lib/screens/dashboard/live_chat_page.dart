@@ -9,11 +9,21 @@ class _LiveChatPage extends StatefulWidget {
 
 class _LiveChatPageState extends State<_LiveChatPage> {
   late Future<List<AppConversation>> conversationsFuture;
+  StreamSubscription<void>? refreshSubscription;
 
   @override
   void initState() {
     super.initState();
     conversationsFuture = AppRepository().loadConversations();
+    refreshSubscription = AppRefreshBus().stream.listen((_) {
+      if (mounted) refresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    refreshSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> refresh() async {
@@ -259,6 +269,7 @@ class _ChatThreadPageState extends State<_ChatThreadPage> {
   late Future<AppUser?> userFuture;
   bool sending = false;
   bool attaching = false;
+  StreamSubscription<void>? refreshSubscription;
 
   @override
   void initState() {
@@ -267,10 +278,14 @@ class _ChatThreadPageState extends State<_ChatThreadPage> {
     messagesFuture = AppRepository().loadConversationMessages(
       widget.conversation.id,
     );
+    refreshSubscription = AppRefreshBus().stream.listen((_) {
+      if (mounted) refreshMessages();
+    });
   }
 
   @override
   void dispose() {
+    refreshSubscription?.cancel();
     controller.dispose();
     scrollController.dispose();
     super.dispose();

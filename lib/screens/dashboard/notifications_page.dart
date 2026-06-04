@@ -9,11 +9,21 @@ class _NotificationsPage extends StatefulWidget {
 
 class _NotificationsPageState extends State<_NotificationsPage> {
   late Future<List<AppNotification>> notificationsFuture;
+  StreamSubscription<void>? refreshSubscription;
 
   @override
   void initState() {
     super.initState();
     notificationsFuture = AppRepository().loadNotifications();
+    refreshSubscription = AppRefreshBus().stream.listen((_) {
+      if (mounted) refresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    refreshSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> refresh() async {

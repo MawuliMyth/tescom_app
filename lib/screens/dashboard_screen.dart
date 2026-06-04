@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -8,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:tescon_app/core/api_config.dart';
+import 'package:tescon_app/core/app_refresh_bus.dart';
 import 'package:tescon_app/core/app_settings_service.dart';
 import 'package:tescon_app/core/app_models.dart';
 import 'package:tescon_app/core/app_repository.dart';
@@ -51,14 +54,42 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with WidgetsBindingObserver {
   final PersistentTabController _controller = PersistentTabController();
   bool _isDrawerOpen = false;
+  Timer? _autoRefreshTimer;
+  int _refreshVersion = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     PushNotificationService().initializeForSignedInUser();
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => _refreshDashboardContent(),
+    );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshDashboardContent();
+    }
+  }
+
+  void _refreshDashboardContent() {
+    AppRefreshBus().refresh();
+    if (!mounted) return;
+    setState(() => _refreshVersion++);
   }
 
   @override
@@ -71,13 +102,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       controller: _controller,
       screens: [
         _DashboardHome(
+          key: ValueKey('home-$_refreshVersion'),
           onDrawerChanged: (isOpen) {
             if (_isDrawerOpen == isOpen) return;
             setState(() => _isDrawerOpen = isOpen);
           },
         ),
-        const _DiscoverScreen(),
-        const _SavedScreen(),
+        _DiscoverScreen(key: ValueKey('discover-$_refreshVersion')),
+        _SavedScreen(key: ValueKey('saved-$_refreshVersion')),
         const _SettingsPage(showBackButton: false),
       ],
       items: [

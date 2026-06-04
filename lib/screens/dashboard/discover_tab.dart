@@ -1,7 +1,7 @@
 part of '../dashboard_screen.dart';
 
 class _DiscoverScreen extends StatefulWidget {
-  const _DiscoverScreen();
+  const _DiscoverScreen({super.key});
 
   @override
   State<_DiscoverScreen> createState() => _DiscoverScreenState();

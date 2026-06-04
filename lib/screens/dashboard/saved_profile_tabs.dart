@@ -1,7 +1,7 @@
 part of '../dashboard_screen.dart';
 
 class _SavedScreen extends StatelessWidget {
-  const _SavedScreen();
+  const _SavedScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

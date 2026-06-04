@@ -1,7 +1,7 @@
 part of '../dashboard_screen.dart';
 
 class _DashboardHome extends StatelessWidget {
-  const _DashboardHome({required this.onDrawerChanged});
+  const _DashboardHome({super.key, required this.onDrawerChanged});
 
   final ValueChanged<bool> onDrawerChanged;
 

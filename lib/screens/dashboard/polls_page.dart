@@ -13,11 +13,21 @@ class _PollsPageState extends State<_PollsPage> {
   final Map<String, String> selectedOptions = {};
   final Set<String> votingPolls = {};
   late Future<AppBootstrap> bootstrapFuture;
+  StreamSubscription<void>? refreshSubscription;
 
   @override
   void initState() {
     super.initState();
     bootstrapFuture = AppRepository().loadBootstrap();
+    refreshSubscription = AppRefreshBus().stream.listen((_) {
+      if (mounted) refreshPolls();
+    });
+  }
+
+  @override
+  void dispose() {
+    refreshSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> refreshPolls() async {

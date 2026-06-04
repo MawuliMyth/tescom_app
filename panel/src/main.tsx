@@ -720,9 +720,9 @@ function DashboardOverview({ onOpenResource }: { onOpenResource: (key: ResourceK
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<Notice | null>(null);
 
-  async function loadSummary() {
-    setLoading(true);
-    setNotice(null);
+  async function loadSummary(showNotice = true) {
+    if (showNotice) setLoading(true);
+    if (showNotice) setNotice(null);
     try {
       const entries = await Promise.all(
         resources.map(async (resource) => {
@@ -733,7 +733,9 @@ function DashboardOverview({ onOpenResource }: { onOpenResource: (key: ResourceK
         })
       );
       setSummary(Object.fromEntries(entries));
-      setNotice({ type: "success", message: "Dashboard synced with live admin data." });
+      if (showNotice) {
+        setNotice({ type: "success", message: "Dashboard synced with live admin data." });
+      }
     } catch (error) {
       setNotice({ type: "error", message: error instanceof Error ? error.message : "Failed to load dashboard" });
     } finally {
@@ -743,6 +745,22 @@ function DashboardOverview({ onOpenResource }: { onOpenResource: (key: ResourceK
 
   useEffect(() => {
     void loadSummary();
+  }, []);
+
+  useEffect(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") void loadSummary(false);
+    };
+    const interval = window.setInterval(refreshIfVisible, 60000);
+    window.addEventListener("focus", refreshIfVisible);
+    window.addEventListener("online", refreshIfVisible);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshIfVisible);
+      window.removeEventListener("online", refreshIfVisible);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
   }, []);
 
   const allRows = Object.values(summary).flat() as AdminRecord[];
@@ -999,19 +1017,37 @@ function ResourceManager({ resource }: { resource: Resource }) {
     return data;
   }
 
-  async function load() {
-    setLoading(true);
-    setNotice(null);
+  async function load(showNotice = true) {
+    if (showNotice) {
+      setLoading(true);
+      setNotice(null);
+    }
     try {
       const data = await request();
       setRows(data?.rows ?? []);
-      setNotice(null);
+      if (showNotice) setNotice(null);
     } catch (error) {
       setNotice({ type: "error", message: error instanceof Error ? error.message : "Failed to load" });
     } finally {
-      setLoading(false);
+      if (showNotice) setLoading(false);
     }
   }
+
+  useEffect(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") void load(false);
+    };
+    const interval = window.setInterval(refreshIfVisible, 60000);
+    window.addEventListener("focus", refreshIfVisible);
+    window.addEventListener("online", refreshIfVisible);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshIfVisible);
+      window.removeEventListener("online", refreshIfVisible);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
+  }, [resource.key]);
 
   async function loadChapterOptions() {
     try {
