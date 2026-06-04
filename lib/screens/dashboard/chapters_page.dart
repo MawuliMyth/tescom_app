@@ -128,11 +128,12 @@ class _ChaptersPage extends StatelessWidget {
       executivesCount: chapterExecutives.isEmpty
           ? chapter.executivesCount
           : chapterExecutives.length,
-      eventsCount: chapterEvents.isEmpty ? chapter.eventsCount : chapterEvents.length,
+      eventsCount: chapterEvents.isEmpty
+          ? chapter.eventsCount
+          : chapterEvents.length,
       newsCount: 0,
       description:
-          chapter.description ??
-          'No chapter description has been added yet.',
+          chapter.description ?? 'No chapter description has been added yet.',
       executives: chapterExecutives,
       members: chapterMembers,
       news: const [],
@@ -144,7 +145,9 @@ class _ChaptersPage extends StatelessWidget {
     final start = '${startsAt.day}/${startsAt.month}/${startsAt.year}';
     if (endsAt == null) return start;
     final end = '${endsAt.day}/${endsAt.month}/${endsAt.year}';
-    return start == end ? '$start, ${_formatTime(startsAt)} - ${_formatTime(endsAt)}' : '$start - $end';
+    return start == end
+        ? '$start, ${_formatTime(startsAt)} - ${_formatTime(endsAt)}'
+        : '$start - $end';
   }
 
   String _formatTime(DateTime value) {

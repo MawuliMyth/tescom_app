@@ -12,6 +12,7 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
   SMTP_ENABLED: z.coerce.boolean().default(false),
+  FIREBASE_SERVICE_ACCOUNT_JSON: z.string().optional(),
   PORT: z.coerce.number().default(4000)
 });
 

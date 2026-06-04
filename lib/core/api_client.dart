@@ -130,18 +130,20 @@ class ApiClient {
     final http.Response response;
     try {
       response = switch (method) {
-        'GET' => await _httpClient
-            .get(uri, headers: headers)
-            .timeout(requestTimeout),
-        'POST' => await _httpClient
-            .post(uri, headers: headers, body: encodedBody)
-            .timeout(requestTimeout),
-        'PATCH' => await _httpClient
-            .patch(uri, headers: headers, body: encodedBody)
-            .timeout(requestTimeout),
-        'DELETE' => await _httpClient
-            .delete(uri, headers: headers)
-            .timeout(requestTimeout),
+        'GET' =>
+          await _httpClient.get(uri, headers: headers).timeout(requestTimeout),
+        'POST' =>
+          await _httpClient
+              .post(uri, headers: headers, body: encodedBody)
+              .timeout(requestTimeout),
+        'PATCH' =>
+          await _httpClient
+              .patch(uri, headers: headers, body: encodedBody)
+              .timeout(requestTimeout),
+        'DELETE' =>
+          await _httpClient
+              .delete(uri, headers: headers)
+              .timeout(requestTimeout),
         _ => throw UnsupportedError('Unsupported method $method'),
       };
     } on TimeoutException {
@@ -172,14 +174,16 @@ class ApiClient {
     if (refreshToken == null) throw const ApiException('Session expired');
 
     try {
-      final response = await _httpClient.post(
-        Uri.parse('${ApiConfig.baseUrl}/api/auth/refresh'),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'refreshToken': refreshToken}),
-      ).timeout(const Duration(seconds: 45));
+      final response = await _httpClient
+          .post(
+            Uri.parse('${ApiConfig.baseUrl}/api/auth/refresh'),
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({'refreshToken': refreshToken}),
+          )
+          .timeout(const Duration(seconds: 45));
 
       final data = _decode(response);
       await _tokenStorage.save(AuthTokens.fromJson(data['tokens']));

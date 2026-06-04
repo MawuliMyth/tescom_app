@@ -100,103 +100,25 @@ void _showSearchSheet(BuildContext context) {
   );
 }
 
-// modal for notifcation
-// void _showDemoSheet(
-//   BuildContext context, {
-//   required String title,
-//   required String message,
-// }) {
-//   showModalBottomSheet<void>(
-//     context: context,
-//     backgroundColor: Colors.white,
-//     shape: const RoundedRectangleBorder(
-//       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-//     ),
-//     builder: (context) {
-//       return Padding(
-//         padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-//         child: Column(
-//           mainAxisSize: MainAxisSize.min,
-//           crossAxisAlignment: CrossAxisAlignment.start,
-//           children: [
-//             Text(
-//               title,
-//               style: GoogleFonts.inter(
-//                 fontSize: 16,
-//                 fontWeight: FontWeight.w700,
-//                 letterSpacing: 0,
-//               ),
-//             ),
-//             const SizedBox(height: 10),
-//             Text(
-//               message,
-//               style: GoogleFonts.inter(
-//                 color: const Color(0xFF666666),
-//                 fontSize: 13,
-//                 height: 1.35,
-//                 letterSpacing: 0,
-//               ),
-//             ),
-//           ],
-//         ),
-//       );
-//     },
-//   );
-// }
-void _showDemoSheet(
-  BuildContext context, {
-  required String title,
-  required String message,
-}) {
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (context) {
-      return SizedBox(
-        width: double.infinity,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.inter(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                message,
-                style: GoogleFonts.inter(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 13,
-                  height: 1.35,
-                  letterSpacing: 0,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
-
 void _showSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
+}
+
+Future<void> _openExternalUrl(BuildContext context, String value) async {
+  final uri = Uri.tryParse(value.trim());
+  if (uri == null || !uri.hasScheme) {
+    _showSnack(context, 'This link is not valid.');
+    return;
+  }
+
+  final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!opened && context.mounted) {
+    _showSnack(context, 'Could not open this link.');
+  }
 }
 
 class _ShimmerBlock extends StatelessWidget {
@@ -435,12 +357,21 @@ class _SearchResultTile extends StatelessWidget {
         ),
         subtitle: Text(result.label),
         trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: () => _showDemoSheet(
+        onTap: () => Navigator.push(
           context,
-          title: result.title,
-          message: 'Opened ${result.label.toLowerCase()} result.',
+          _adaptivePageRoute(context, builder: (_) => _pageForResult(result)),
         ),
       ),
     );
+  }
+
+  Widget _pageForResult(_SearchResult result) {
+    final label = result.label.toLowerCase();
+    if (label.contains('event')) return const _EventsPage();
+    if (label.contains('job')) return const _JobsPage();
+    if (label.contains('member') || label.contains('biography')) {
+      return const _MemberDirectoryPage();
+    }
+    return const _LatestNewsPage();
   }
 }

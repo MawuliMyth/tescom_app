@@ -65,7 +65,14 @@ class TokenStorage {
     return expiresAt.isBefore(DateTime.now().add(const Duration(minutes: 1)));
   }
 
-  Future<void> clear() => _storage.deleteAll();
+  Future<void> clear() {
+    return Future.wait([
+      _storage.delete(key: _accessTokenKey),
+      _storage.delete(key: _refreshTokenKey),
+      _storage.delete(key: _accessTokenExpiresAtKey),
+      _storage.delete(key: _refreshTokenExpiresAtKey),
+    ]);
+  }
 
   Future<DateTime?> _readDate(String key) async {
     final value = await _storage.read(key: key);

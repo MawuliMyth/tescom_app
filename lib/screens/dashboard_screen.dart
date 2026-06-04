@@ -10,6 +10,9 @@ import 'package:tescon_app/core/app_settings_service.dart';
 import 'package:tescon_app/core/app_models.dart';
 import 'package:tescon_app/core/app_repository.dart';
 import 'package:tescon_app/core/auth_service.dart';
+import 'package:tescon_app/core/biometric_auth_service.dart';
+import 'package:tescon_app/core/push_notification_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 part 'dashboard/home_tab.dart';
 part 'dashboard/drawer.dart';
@@ -49,6 +52,12 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final PersistentTabController _controller = PersistentTabController();
   bool _isDrawerOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    PushNotificationService().initializeForSignedInUser();
+  }
 
   @override
   Widget build(BuildContext context) {

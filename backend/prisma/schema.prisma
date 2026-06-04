@@ -65,6 +65,7 @@ model User {
   messages       Message[]
   conversationParticipants ConversationParticipant[]
   notifications  Notification[]
+  deviceTokens    DeviceToken[]
   savedItems     SavedItem[]
   refreshTokens  RefreshToken[]
   createdNews    NewsArticle[]  @relation("NewsCreator")
@@ -76,6 +77,21 @@ model User {
   jobApplications JobApplication[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+}
+
+model DeviceToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  platform  String?
+  enabled   Boolean  @default(true)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSeenAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([enabled])
 }
 
 model RefreshToken {

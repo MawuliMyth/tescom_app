@@ -90,10 +90,6 @@ class _SiginScreenState extends State<SiginScreen> {
                             letterSpacing: 0,
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        const _GoogleSignInButton(),
-                        const SizedBox(height: 30),
-                        const _DividerLabel(),
                         const SizedBox(height: 30),
                         _AuthInput(
                           controller: _emailController,
@@ -212,70 +208,6 @@ String? _validateEmail(String? value) {
 String? _validateRequiredPassword(String? value) {
   if ((value ?? '').isEmpty) return 'Password is required';
   return null;
-}
-
-class _GoogleSignInButton extends StatelessWidget {
-  const _GoogleSignInButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: FilledButton(
-        onPressed: () {},
-        style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFFF6F6F6),
-          foregroundColor: const Color(0xFF8D8D8D),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset('assets/images/g.png', width: 18, height: 18),
-            const SizedBox(width: 10),
-            Text(
-              'Sign In With Google',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-                letterSpacing: 0,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DividerLabel extends StatelessWidget {
-  const _DividerLabel();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Expanded(child: Divider(color: Color(0xFFE1E1E1))),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text(
-            'OR',
-            style: GoogleFonts.poppins(
-              color: const Color(0xFFA7A7A7),
-              fontSize: 8,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0,
-            ),
-          ),
-        ),
-        const Expanded(child: Divider(color: Color(0xFFE1E1E1))),
-      ],
-    );
-  }
 }
 
 class _AuthInput extends StatelessWidget {

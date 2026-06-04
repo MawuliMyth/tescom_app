@@ -152,10 +152,12 @@ class _PollsHeader extends StatelessWidget {
         ),
         _PlainIconButton(
           icon: Icons.notifications_none_rounded,
-          onTap: () => _showDemoSheet(
+          onTap: () => Navigator.push(
             context,
-            title: 'Activity Updates',
-            message: 'New polls and surveys will appear here.',
+            _adaptivePageRoute(
+              context,
+              builder: (_) => const _NotificationsPage(),
+            ),
           ),
         ),
       ],

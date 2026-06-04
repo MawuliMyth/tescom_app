@@ -484,11 +484,8 @@ class _EventDetailsPage extends StatelessWidget {
                       ? const SizedBox(width: 36)
                       : _CircleIconButton(
                           icon: Icons.chat_bubble_outline_rounded,
-                          onTap: () => _showDemoSheet(
-                            context,
-                            title: 'Event Chat',
-                            message: event.chatUrl!,
-                          ),
+                          onTap: () =>
+                              _openExternalUrl(context, event.chatUrl!),
                         ),
                 ],
               ),

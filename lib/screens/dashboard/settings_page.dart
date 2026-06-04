@@ -12,7 +12,10 @@ class _SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<_SettingsPage> {
   bool notifications = true;
+  bool biometricUnlock = false;
   final settingsService = AppSettingsService();
+  final biometricService = BiometricAuthService();
+  final pushNotificationService = PushNotificationService();
 
   @override
   void initState() {
@@ -22,13 +25,44 @@ class _SettingsPageState extends State<_SettingsPage> {
 
   Future<void> _loadSettings() async {
     final enabled = await settingsService.notificationsEnabled();
+    final biometricEnabled = await biometricService.isEnabled();
     if (!mounted) return;
-    setState(() => notifications = enabled);
+    setState(() {
+      notifications = enabled;
+      biometricUnlock = biometricEnabled;
+    });
   }
 
   Future<void> _setNotifications(bool value) async {
     setState(() => notifications = value);
-    await settingsService.setNotificationsEnabled(value);
+    if (value) {
+      await pushNotificationService.enableNotifications();
+    } else {
+      await pushNotificationService.disableNotifications();
+    }
+  }
+
+  Future<void> _setBiometricUnlock(bool value) async {
+    if (value) {
+      final available = await biometricService.isAvailable();
+      if (!available) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Biometric unlock is not available on this device'),
+          ),
+        );
+        return;
+      }
+      final authenticated = await biometricService.authenticate(
+        reason: 'Confirm your biometrics to enable app unlock',
+      );
+      if (!authenticated) return;
+    }
+
+    await biometricService.setEnabled(value);
+    if (!mounted) return;
+    setState(() => biometricUnlock = value);
   }
 
   Future<void> _clearImageCache() async {
@@ -76,6 +110,12 @@ class _SettingsPageState extends State<_SettingsPage> {
                     title: 'Notifications and sounds',
                     value: notifications,
                     onChanged: (value) => _setNotifications(value),
+                  ),
+                  _SettingsToggleRow(
+                    icon: Icons.fingerprint_rounded,
+                    title: 'Biometric app unlock',
+                    value: biometricUnlock,
+                    onChanged: (value) => _setBiometricUnlock(value),
                   ),
                   const _SettingsValueRow(
                     icon: Icons.language_rounded,

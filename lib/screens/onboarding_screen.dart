@@ -16,11 +16,7 @@ class OnboardingScreen extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF80B6DB),
-              Color(0xFF24569A),
-              Color(0xFF09286E),
-            ],
+            colors: [Color(0xFF80B6DB), Color(0xFF24569A), Color(0xFF09286E)],
             stops: [0, 0.55, 1],
           ),
         ),
@@ -154,9 +150,7 @@ class _OnboardingSurface extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
         color: Colors.white.withValues(alpha: 0.12),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.22),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
       child: child,
     );

@@ -51,6 +51,17 @@ class AppRepository {
     await _apiClient.patch('/api/app/notifications/$id/read');
   }
 
+  Future<void> registerDeviceToken({
+    required String token,
+    required String platform,
+    bool enabled = true,
+  }) async {
+    await _apiClient.post(
+      '/api/app/device-tokens',
+      body: {'token': token, 'platform': platform, 'enabled': enabled},
+    );
+  }
+
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,

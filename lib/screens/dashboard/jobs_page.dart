@@ -441,9 +441,9 @@ class _JobDetailPageState extends State<_JobDetailPage> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_friendlyError(error))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
     } finally {
       if (mounted) setState(() => applying = false);
     }
@@ -504,9 +504,7 @@ class _JobDetailPageState extends State<_JobDetailPage> {
               right: 18,
               bottom: 24,
               child: FilledButton(
-                onPressed: applied
-                    ? null
-                    : apply,
+                onPressed: applied ? null : apply,
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF34368C),
                   foregroundColor: Colors.white,
@@ -517,7 +515,11 @@ class _JobDetailPageState extends State<_JobDetailPage> {
                   ),
                 ),
                 child: Text(
-                  applying ? 'SUBMITTING...' : applied ? 'APPLIED' : 'APPLY NOW',
+                  applying
+                      ? 'SUBMITTING...'
+                      : applied
+                      ? 'APPLIED'
+                      : 'APPLY NOW',
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
@@ -629,13 +631,15 @@ class _JobApplicationSheetState extends State<_JobApplicationSheet> {
   void initState() {
     super.initState();
     userFuture = AppRepository().loadCurrentUser();
-    userFuture.then((user) {
-      if (!mounted || user == null) return;
-      fullNameController.text = user.fullName;
-      emailController.text = user.email;
-      phoneController.text = user.phone ?? '';
-      institutionController.text = user.institution ?? '';
-    }).catchError((_) {});
+    userFuture
+        .then((user) {
+          if (!mounted || user == null) return;
+          fullNameController.text = user.fullName;
+          emailController.text = user.email;
+          phoneController.text = user.phone ?? '';
+          institutionController.text = user.institution ?? '';
+        })
+        .catchError((_) {});
   }
 
   @override

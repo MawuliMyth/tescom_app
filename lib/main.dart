@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:tescon_app/core/auth_service.dart';
+import 'package:tescon_app/core/biometric_auth_service.dart';
+import 'package:tescon_app/core/push_notification_service.dart';
 import 'package:tescon_app/screens/dashboard_screen.dart';
 import 'package:tescon_app/screens/onboarding_screen.dart';
 import 'package:tescon_app/screens/sigin_screen.dart';
 import 'package:tescon_app/screens/signup_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await PushNotificationService.ensureFirebaseInitialized();
   runApp(const MyApp());
 }
 
@@ -48,7 +52,7 @@ class _AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<bool>(
-      future: AuthService().hasSession(),
+      future: _canEnterApp(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Scaffold(body: _AuthGateShimmer());
@@ -59,6 +63,15 @@ class _AuthGate extends StatelessWidget {
             : const OnboardingScreen();
       },
     );
+  }
+
+  Future<bool> _canEnterApp() async {
+    final hasSession = await AuthService().hasSession();
+    if (!hasSession) return false;
+
+    final biometricService = BiometricAuthService();
+    if (!await biometricService.isEnabled()) return true;
+    return biometricService.authenticate();
   }
 }
 

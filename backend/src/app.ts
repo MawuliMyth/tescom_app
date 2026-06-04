@@ -2,6 +2,8 @@ import cors from "cors";
 import express from "express";
 import multer from "multer";
 import { put } from "@vercel/blob";
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getMessaging } from "firebase-admin/messaging";
 import {
   PrismaClientInitializationError,
   PrismaClientKnownRequestError
@@ -32,6 +34,21 @@ const mediaMimeTypes = new Set([...imageMimeTypes, "video/mp4", "video/webm", "v
 const useBlobStorage = Boolean(env.BLOB_READ_WRITE_TOKEN);
 
 fs.mkdirSync(uploadDir, { recursive: true });
+
+let firebaseReady = false;
+try {
+  if (env.FIREBASE_SERVICE_ACCOUNT_JSON && !getApps().length) {
+    initializeApp({
+      credential: cert(JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON))
+    });
+    firebaseReady = true;
+  } else {
+    firebaseReady = getApps().length > 0;
+  }
+} catch (error) {
+  firebaseReady = false;
+  console.warn("Firebase Admin was not initialized", error);
+}
 
 const upload = multer({
   storage: useBlobStorage
@@ -618,6 +635,50 @@ app.patch("/api/app/notifications/:id/read", requireAuth, asyncHandler(async (re
   res.json({ notification });
 }));
 
+app.post("/api/app/device-tokens", requireAuth, asyncHandler(async (req, res) => {
+  const body = z.object({
+    token: z.string().min(10),
+    platform: z.string().optional(),
+    enabled: z.boolean().default(true)
+  }).parse(req.body);
+
+  const deviceToken = await db.deviceToken.upsert({
+    where: { token: body.token },
+    update: {
+      userId: req.user!.id,
+      platform: body.platform,
+      enabled: body.enabled,
+      lastSeenAt: new Date()
+    },
+    create: {
+      token: body.token,
+      platform: body.platform,
+      enabled: body.enabled,
+      userId: req.user!.id
+    }
+  });
+
+  res.status(201).json({ deviceToken });
+}));
+
+app.delete("/api/app/device-tokens", requireAuth, asyncHandler(async (req, res) => {
+  const body = z.object({ token: z.string().min(10) }).parse(req.body);
+  await db.deviceToken.updateMany({
+    where: { token: body.token, userId: req.user!.id },
+    data: { enabled: false }
+  });
+  res.status(204).send();
+}));
+
+app.post("/api/app/device-tokens/disable", requireAuth, asyncHandler(async (req, res) => {
+  const body = z.object({ token: z.string().min(10) }).parse(req.body);
+  await db.deviceToken.updateMany({
+    where: { token: body.token, userId: req.user!.id },
+    data: { enabled: false }
+  });
+  res.status(204).send();
+}));
+
 app.get("/api/app/conversations", requireAuth, asyncHandler(async (req, res) => {
   const conversations = await db.conversation.findMany({
     where: {
@@ -998,6 +1059,55 @@ async function ownedCreateData(req: express.Request, resourceName: string, data:
   return { ...data, creatorId: req.user!.id };
 }
 
+type NotificationPayload = {
+  id: string;
+  title: string;
+  body: string;
+  userId?: string | null;
+};
+
+async function sendPushForNotification(notification: NotificationPayload) {
+  if (!firebaseReady) return;
+
+  const tokens = await db.deviceToken.findMany({
+    where: {
+      enabled: true,
+      ...(notification.userId ? { userId: notification.userId } : {})
+    },
+    select: { id: true, token: true }
+  });
+  if (!tokens.length) return;
+
+  const messaging = getMessaging();
+  const invalidTokenIds: string[] = [];
+  const chunkSize = 500;
+
+  for (let index = 0; index < tokens.length; index += chunkSize) {
+    const chunk = tokens.slice(index, index + chunkSize);
+    const response = await messaging.sendEachForMulticast({
+      tokens: chunk.map((item: { token: string }) => item.token),
+      notification: {
+        title: notification.title,
+        body: notification.body
+      },
+      data: {
+        type: "notification",
+        notificationId: notification.id
+      }
+    });
+
+    response.responses.forEach((result, resultIndex) => {
+      if (!result.success && result.error?.code?.includes("registration-token")) {
+        invalidTokenIds.push(chunk[resultIndex].id);
+      }
+    });
+  }
+
+  if (invalidTokenIds.length) {
+    await db.deviceToken.deleteMany({ where: { id: { in: invalidTokenIds } } });
+  }
+}
+
 const executiveWhere = {
   role: "USER" as const,
   organizationRole: { not: null }
@@ -1137,6 +1247,9 @@ for (const [name, config] of Object.entries(resources)) {
         update: { role: "OWNER" },
         create: { conversationId: row.id, userId: req.user!.id, role: "OWNER" }
       });
+    }
+    if (name === "notifications") {
+      await sendPushForNotification(row);
     }
     res.status(201).json({ row });
   }));

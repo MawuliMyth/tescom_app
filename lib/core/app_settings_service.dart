@@ -9,6 +9,7 @@ class AppSettingsService {
           );
 
   static const _notificationsEnabledKey = 'settings_notifications_enabled';
+  static const _biometricUnlockEnabledKey = 'settings_biometric_unlock_enabled';
 
   final FlutterSecureStorage _storage;
 
@@ -20,6 +21,18 @@ class AppSettingsService {
   Future<void> setNotificationsEnabled(bool enabled) {
     return _storage.write(
       key: _notificationsEnabledKey,
+      value: enabled.toString(),
+    );
+  }
+
+  Future<bool> biometricUnlockEnabled() async {
+    final value = await _storage.read(key: _biometricUnlockEnabledKey);
+    return value == 'true';
+  }
+
+  Future<void> setBiometricUnlockEnabled(bool enabled) {
+    return _storage.write(
+      key: _biometricUnlockEnabledKey,
       value: enabled.toString(),
     );
   }
