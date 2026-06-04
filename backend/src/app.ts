@@ -316,6 +316,7 @@ const adminSchemas = {
     create: z.object({
       question: z.string().min(2),
       description: z.string().optional(),
+      options: z.array(z.string().min(1)).min(2).max(20),
       status: publishStatusSchema.default("PUBLISHED"),
       closesAt: optionalDateSchema,
       visibility: z.string().min(2).default("members"),
@@ -324,6 +325,7 @@ const adminSchemas = {
     update: z.object({
       question: z.string().min(2).optional(),
       description: z.string().optional(),
+      options: z.array(z.string().min(1)).min(2).max(20).optional(),
       status: publishStatusSchema.optional(),
       closesAt: optionalDateSchema,
       visibility: z.string().min(2).optional(),
@@ -1275,6 +1277,12 @@ for (const [name, config] of Object.entries(resources)) {
       : parsed;
     const data = await ownedCreateData(req, name, rawData);
     delete data.password;
+    if (name === "polls") {
+      const options = data.options as string[];
+      data.options = {
+        create: options.map((text) => ({ text }))
+      };
+    }
     const row = await (config.delegate as any).create({
       data,
       ...(config as any).include ? { include: (config as any).include } : {},
@@ -1302,6 +1310,27 @@ for (const [name, config] of Object.entries(resources)) {
     if (name === "users" && data.password) {
       data.passwordHash = await hashPassword(data.password);
       delete data.password;
+    }
+    if (name === "polls" && Array.isArray(data.options)) {
+      const optionTexts = data.options as string[];
+      delete data.options;
+      await prisma.pollOption.deleteMany({
+        where: {
+          pollId: String(req.params.id),
+          votes: { none: {} }
+        }
+      });
+      for (const text of optionTexts) {
+        const existing = await prisma.pollOption.findFirst({
+          where: { pollId: String(req.params.id), text },
+          select: { id: true }
+        });
+        if (!existing) {
+          await prisma.pollOption.create({
+            data: { pollId: String(req.params.id), text }
+          });
+        }
+      }
     }
     const row = await (config.delegate as any).update({
       where: { id: String(req.params.id) },

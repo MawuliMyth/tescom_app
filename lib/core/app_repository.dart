@@ -101,7 +101,7 @@ class AppRepository {
 
   Future<AppMessage> sendConversationMessage({
     required String conversationId,
-    required String body,
+    String body = '',
     String? mediaUrl,
     String? mediaType,
   }) async {
@@ -113,6 +113,16 @@ class AppRepository {
       body: payload,
     );
     return AppMessage.fromJson(data['message'] as Map<String, dynamic>);
+  }
+
+  Future<void> addConversationParticipant({
+    required String conversationId,
+    required String userId,
+  }) async {
+    await _apiClient.post(
+      '/api/app/conversations/$conversationId/participants',
+      body: {'userId': userId},
+    );
   }
 
   Future<({String url, String contentType})> uploadChatMedia({

@@ -343,6 +343,7 @@ class AppConversation {
     required this.id,
     required this.title,
     required this.isGroup,
+    required this.participants,
     required this.messages,
     this.updatedAt,
     this.createdAt,
@@ -351,6 +352,7 @@ class AppConversation {
   final String id;
   final String title;
   final bool isGroup;
+  final List<AppConversationParticipant> participants;
   final List<AppMessage> messages;
   final DateTime? updatedAt;
   final DateTime? createdAt;
@@ -362,9 +364,38 @@ class AppConversation {
       id: json['id'] as String? ?? '',
       title: json['title'] as String? ?? '',
       isGroup: json['isGroup'] as bool? ?? true,
+      participants: _list(
+        json['participants'],
+        AppConversationParticipant.fromJson,
+      ),
       messages: _list(json['messages'], AppMessage.fromJson),
       updatedAt: _date(json['updatedAt']),
       createdAt: _date(json['createdAt']),
+    );
+  }
+}
+
+class AppConversationParticipant {
+  const AppConversationParticipant({
+    required this.id,
+    required this.userId,
+    this.role,
+    this.user,
+  });
+
+  final String id;
+  final String userId;
+  final String? role;
+  final AppUser? user;
+
+  factory AppConversationParticipant.fromJson(Map<String, dynamic> json) {
+    return AppConversationParticipant(
+      id: json['id'] as String? ?? '',
+      userId: json['userId'] as String? ?? '',
+      role: json['role'] as String?,
+      user: json['user'] is Map<String, dynamic>
+          ? AppUser.fromJson(json['user'] as Map<String, dynamic>)
+          : null,
     );
   }
 }

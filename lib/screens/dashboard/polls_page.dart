@@ -11,6 +11,21 @@ class _PollsPage extends StatefulWidget {
 class _PollsPageState extends State<_PollsPage> {
   String selectedTab = 'Active';
   final Map<String, String> selectedOptions = {};
+  final Set<String> votingPolls = {};
+  late Future<AppBootstrap> bootstrapFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    bootstrapFuture = AppRepository().loadBootstrap();
+  }
+
+  Future<void> refreshPolls() async {
+    setState(() {
+      bootstrapFuture = AppRepository().loadBootstrap();
+    });
+    await bootstrapFuture;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +45,7 @@ class _PollsPageState extends State<_PollsPage> {
               ),
               const SizedBox(height: 18),
               FutureBuilder<AppBootstrap>(
-                future: AppRepository().loadBootstrap(),
+                future: bootstrapFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const _ListShimmer(itemCount: 2);
@@ -50,13 +65,25 @@ class _PollsPageState extends State<_PollsPage> {
                         child: _PollActivityCard(
                           poll: poll,
                           selectedOption: selectedOptions[poll.id],
+                          voting: votingPolls.contains(poll.id),
                           onSelected: (value) async {
+                            if (votingPolls.contains(poll.id)) return;
                             final previousValue = selectedOptions[poll.id];
-                            setState(() => selectedOptions[poll.id] = value);
+                            setState(() {
+                              selectedOptions[poll.id] = value;
+                              votingPolls.add(poll.id);
+                            });
                             try {
                               await AppRepository().voteInPoll(
                                 pollId: poll.id,
                                 optionId: value,
+                              );
+                              await refreshPolls();
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Vote submitted.'),
+                                ),
                               );
                             } catch (error) {
                               if (!context.mounted) return;
@@ -70,7 +97,21 @@ class _PollsPageState extends State<_PollsPage> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text(_friendlyError(error))),
                               );
+                            } finally {
+                              if (mounted) {
+                                setState(() => votingPolls.remove(poll.id));
+                              }
                             }
+                          },
+                          onShare: () {
+                            Clipboard.setData(
+                              ClipboardData(text: poll.question),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Poll question copied.'),
+                              ),
+                            );
                           },
                         ),
                       );
@@ -289,12 +330,16 @@ class _PollActivityCard extends StatelessWidget {
   const _PollActivityCard({
     required this.poll,
     required this.selectedOption,
+    required this.voting,
     required this.onSelected,
+    required this.onShare,
   });
 
   final AppPoll poll;
   final String? selectedOption;
+  final bool voting;
   final ValueChanged<String> onSelected;
+  final VoidCallback onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -376,11 +421,11 @@ class _PollActivityCard extends StatelessWidget {
                   : ((option.voteCount / totalVotes) * 100).round(),
             );
             final isSelected = selectedOption == option.id;
-            final value = isSelected ? 100 : pollOption.percent;
             return _PollOptionBar(
               option: pollOption.label,
-              percent: value,
+              percent: pollOption.percent,
               selected: isSelected,
+              disabled: voting,
               onTap: () => onSelected(option.id),
             );
           }),
@@ -388,41 +433,41 @@ class _PollActivityCard extends StatelessWidget {
           Row(
             children: [
               const Icon(
-                Icons.favorite_rounded,
-                color: Color(0xFFEF4444),
+                Icons.how_to_vote_outlined,
+                color: Color(0xFF34368C),
                 size: 18,
               ),
               const SizedBox(width: 5),
               Text(
-                '12',
+                '$totalVotes votes',
                 style: GoogleFonts.inter(fontSize: 11, letterSpacing: 0),
               ),
               const SizedBox(width: 18),
               const Icon(
-                Icons.chat_bubble_outline_rounded,
+                Icons.checklist_rounded,
                 color: Color(0xFF777777),
                 size: 17,
               ),
               const SizedBox(width: 5),
               Text(
-                '12',
+                '${poll.options.length} options',
                 style: GoogleFonts.inter(fontSize: 11, letterSpacing: 0),
               ),
               const Spacer(),
-              Text(
-                'Share',
-                style: GoogleFonts.inter(
-                  color: const Color(0xFF34368C),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0,
+              TextButton.icon(
+                onPressed: onShare,
+                icon: const Icon(Icons.ios_share_rounded, size: 16),
+                label: const Text('Share'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF34368C),
+                  textStyle: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
                 ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.ios_share_rounded,
-                color: Color(0xFF34368C),
-                size: 16,
               ),
             ],
           ),
@@ -438,18 +483,20 @@ class _PollOptionBar extends StatelessWidget {
     required this.option,
     required this.percent,
     required this.selected,
+    required this.disabled,
     required this.onTap,
   });
 
   final String option;
   final int percent;
   final bool selected;
+  final bool disabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap,
+      onTap: disabled ? null : onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.only(bottom: 9),

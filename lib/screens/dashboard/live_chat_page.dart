@@ -254,9 +254,11 @@ class _ChatThreadPage extends StatefulWidget {
 class _ChatThreadPageState extends State<_ChatThreadPage> {
   final controller = TextEditingController();
   final scrollController = ScrollController();
+  final imagePicker = ImagePicker();
   late Future<List<AppMessage>> messagesFuture;
   late Future<AppUser?> userFuture;
   bool sending = false;
+  bool attaching = false;
 
   @override
   void initState() {
@@ -312,6 +314,75 @@ class _ChatThreadPageState extends State<_ChatThreadPage> {
     }
   }
 
+  Future<void> attachMedia({required bool video}) async {
+    if (attaching || sending) return;
+    try {
+      final picked = video
+          ? await imagePicker.pickVideo(source: ImageSource.gallery)
+          : await imagePicker.pickImage(
+              source: ImageSource.gallery,
+              imageQuality: 88,
+            );
+      if (picked == null) return;
+      setState(() => attaching = true);
+      final upload = await AppRepository().uploadChatMedia(
+        filename: picked.name,
+        bytes: await picked.readAsBytes(),
+        contentType:
+            picked.mimeType ?? _mediaTypeFromFilename(picked.name, video),
+      );
+      await AppRepository().sendConversationMessage(
+        conversationId: widget.conversation.id,
+        mediaUrl: upload.url,
+        mediaType: upload.contentType,
+      );
+      await refreshMessages();
+      scrollToBottom();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_chatError(error))));
+    } finally {
+      if (mounted) setState(() => attaching = false);
+    }
+  }
+
+  Future<void> inviteMember() async {
+    try {
+      final members = await AppRepository().loadMembers();
+      if (!mounted) return;
+      final invitedIds = widget.conversation.participants
+          .map((participant) => participant.userId)
+          .toSet();
+      final available = members
+          .where((member) => !invitedIds.contains(member.id))
+          .toList(growable: false);
+      final selected = await showModalBottomSheet<AppUser>(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        builder: (_) => _InviteMemberSheet(members: available),
+      );
+      if (selected == null) return;
+      await AppRepository().addConversationParticipant(
+        conversationId: widget.conversation.id,
+        userId: selected.id,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${selected.fullName} was invited.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_chatError(error))));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<AppUser?>(
@@ -334,6 +405,13 @@ class _ChatThreadPageState extends State<_ChatThreadPage> {
                 letterSpacing: 0,
               ),
             ),
+            actions: [
+              IconButton(
+                tooltip: 'Invite member',
+                onPressed: inviteMember,
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+              ),
+            ],
           ),
           body: Column(
             children: [
@@ -381,8 +459,10 @@ class _ChatThreadPageState extends State<_ChatThreadPage> {
               ),
               _MessageInput(
                 controller: controller,
-                sending: sending,
+                sending: sending || attaching,
                 onSend: sendMessage,
+                onAttachImage: () => attachMedia(video: false),
+                onAttachVideo: () => attachMedia(video: true),
               ),
             ],
           ),
@@ -443,6 +523,10 @@ class _MessageBubble extends StatelessWidget {
                     letterSpacing: 0,
                   ),
                 ),
+                if (_hasMedia(message)) ...[
+                  if (message.body.trim().isNotEmpty) const SizedBox(height: 8),
+                  _MessageMedia(message: message),
+                ],
                 const SizedBox(height: 3),
                 Align(
                   alignment: Alignment.centerRight,
@@ -470,11 +554,15 @@ class _MessageInput extends StatelessWidget {
     required this.controller,
     required this.sending,
     required this.onSend,
+    required this.onAttachImage,
+    required this.onAttachVideo,
   });
 
   final TextEditingController controller;
   final bool sending;
   final VoidCallback onSend;
+  final VoidCallback onAttachImage;
+  final VoidCallback onAttachVideo;
 
   @override
   Widget build(BuildContext context) {
@@ -483,34 +571,185 @@ class _MessageInput extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
         color: Colors.white,
-        child: TextField(
-          controller: controller,
-          minLines: 1,
-          maxLines: 3,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: InputDecoration(
-            hintText: 'Type a message',
-            filled: true,
-            fillColor: const Color(0xFFF1F5F9),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide.none,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            PopupMenuButton<String>(
+              tooltip: 'Attach media',
+              enabled: !sending,
+              icon: const Icon(
+                Icons.add_circle_outline_rounded,
+                color: Color(0xFF34368C),
+              ),
+              onSelected: (value) {
+                if (value == 'image') onAttachImage();
+                if (value == 'video') onAttachVideo();
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'image', child: Text('Image')),
+                PopupMenuItem(value: 'video', child: Text('Video')),
+              ],
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 10,
-            ),
-            suffixIcon: SizedBox(
-              width: 48,
-              child: IconButton(
-                onPressed: sending ? null : onSend,
-                icon: Icon(
-                  sending ? Icons.hourglass_top_rounded : Icons.send_rounded,
-                  color: const Color(0xFF34368C),
+            Expanded(
+              child: TextField(
+                controller: controller,
+                minLines: 1,
+                maxLines: 3,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  hintText: 'Type a message',
+                  filled: true,
+                  fillColor: const Color(0xFFF1F5F9),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                 ),
               ),
             ),
+            const SizedBox(width: 6),
+            IconButton(
+              onPressed: sending ? null : onSend,
+              icon: Icon(
+                sending ? Icons.hourglass_top_rounded : Icons.send_rounded,
+                color: const Color(0xFF34368C),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageMedia extends StatelessWidget {
+  const _MessageMedia({required this.message});
+
+  final AppMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = message.mediaUrl;
+    if (url == null || url.trim().isEmpty) return const SizedBox.shrink();
+    if (_isImageMessage(message)) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: CachedNetworkImage(
+          imageUrl: ApiConfig.mediaUrl(url),
+          width: double.infinity,
+          fit: BoxFit.cover,
+          placeholder: (_, _) =>
+              const SizedBox(height: 150, child: _ListShimmer(itemCount: 1)),
+          errorWidget: (_, _, _) => const SizedBox(
+            height: 120,
+            child: Center(child: Icon(Icons.broken_image_outlined)),
           ),
+        ),
+      );
+    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.play_circle_outline_rounded,
+            color: Color(0xFF34368C),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Video attachment',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                color: Colors.black,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InviteMemberSheet extends StatelessWidget {
+  const _InviteMemberSheet({required this.members});
+
+  final List<AppUser> members;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Invite member',
+              style: GoogleFonts.inter(
+                color: Colors.black,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (members.isEmpty)
+              const _ChatEmptyState(
+                title: 'No members available',
+                message: 'Everyone visible to you is already in this chat.',
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: members.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final member = members[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: const Color(0xFFE8ECFF),
+                        backgroundImage: _chatAvatarProvider(member),
+                      ),
+                      title: Text(
+                        member.fullName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        member.institution ?? member.organizationRole ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () => Navigator.pop(context, member),
+                    );
+                  },
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -566,7 +805,8 @@ class _ChatEmptyState extends StatelessWidget {
 
 String _messageText(AppMessage message) {
   if (message.body.trim().isNotEmpty) return message.body;
-  if (message.mediaUrl?.trim().isNotEmpty == true) return 'Media message';
+  if (_isImageMessage(message)) return 'Image';
+  if (message.mediaUrl?.trim().isNotEmpty == true) return 'Video';
   return '';
 }
 
@@ -606,4 +846,34 @@ String _chatTime(DateTime? value) {
   final hour = local.hour.toString().padLeft(2, '0');
   final minute = local.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
+}
+
+bool _hasMedia(AppMessage message) =>
+    message.mediaUrl != null && message.mediaUrl!.trim().isNotEmpty;
+
+bool _isImageMessage(AppMessage message) =>
+    _hasMedia(message) &&
+    (message.mediaType?.startsWith('image/') == true ||
+        RegExp(
+          r'\.(jpe?g|png|webp|gif)$',
+          caseSensitive: false,
+        ).hasMatch(message.mediaUrl!));
+
+ImageProvider _chatAvatarProvider(AppUser member) {
+  final avatar = member.avatarUrl;
+  if (avatar != null && avatar.trim().isNotEmpty) {
+    return CachedNetworkImageProvider(ApiConfig.mediaUrl(avatar));
+  }
+  return const AssetImage('assets/images/logo.png');
+}
+
+String _mediaTypeFromFilename(String filename, bool video) {
+  final lower = filename.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.mp4')) return 'video/mp4';
+  if (lower.endsWith('.webm')) return 'video/webm';
+  if (lower.endsWith('.mov')) return 'video/quicktime';
+  return video ? 'video/mp4' : 'image/jpeg';
 }

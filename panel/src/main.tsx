@@ -113,7 +113,7 @@ type ResourceKey =
 
 type ActiveKey = "dashboard" | ResourceKey;
 
-type FieldType = "text" | "textarea" | "datetime-local" | "select" | "password" | "checkbox" | "image" | "image-list";
+type FieldType = "text" | "textarea" | "lines" | "datetime-local" | "select" | "password" | "checkbox" | "image" | "image-list";
 type SelectOption = string | { value: string; label: string };
 
 type Resource = {
@@ -327,6 +327,7 @@ const resources: Resource[] = [
     fields: [
       { key: "question", label: "Question" },
       { key: "description", label: "Description", type: "textarea" },
+      { key: "options", label: "Options, one per line", type: "lines" },
       { key: "visibility", label: "Visibility", type: "select", options: ["members", "public", "executives"] },
       { key: "allowMultipleVotes", label: "Allow multiple votes", type: "checkbox" },
       { key: "status", label: "Status", type: "select", options: publishOptions },
@@ -1550,7 +1551,7 @@ function FieldInput({
     );
   }
 
-  if (field.type === "textarea") {
+  if (field.type === "textarea" || field.type === "lines") {
     return (
       <label className="span-2">
         {field.label}
@@ -1881,6 +1882,13 @@ function normalizePayload(form: Record<string, unknown>, fields: Field[]) {
       payload[field.key] = Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
       return payload;
     }
+    if (field.type === "lines") {
+      const items = typeof value === "string"
+        ? Array.from(new Set(value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean)))
+        : [];
+      if (items.length) payload[field.key] = items;
+      return payload;
+    }
     if (field.type === "image" && value === null) {
       payload[field.key] = null;
       return payload;
@@ -1892,13 +1900,22 @@ function normalizePayload(form: Record<string, unknown>, fields: Field[]) {
 }
 
 function defaultFormFor(resource: Resource) {
-  return ["events", "polls"].includes(resource.key) ? { status: "PUBLISHED" } : {};
+  if (resource.key === "polls") return { status: "PUBLISHED", options: "Yes\nNo" };
+  return resource.key === "events" ? { status: "PUBLISHED" } : {};
 }
 
 function toEditableForm(row: AdminRecord, fields: Field[]) {
   return fields.reduce<Record<string, unknown>>((form, field) => {
     const value = row[field.key];
-    if (field.type === "datetime-local" && typeof value === "string") {
+    if (field.type === "lines" && Array.isArray(value)) {
+      form[field.key] = value
+        .map((item) => {
+          if (item && typeof item === "object" && "text" in item) return String((item as { text?: unknown }).text ?? "");
+          return String(item ?? "");
+        })
+        .filter(Boolean)
+        .join("\n");
+    } else if (field.type === "datetime-local" && typeof value === "string") {
       form[field.key] = new Date(value).toISOString().slice(0, 16);
     } else if (field.key !== "password") {
       form[field.key] = value ?? "";
