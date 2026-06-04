@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "374173067582-jn08f9kd2nvi3s2djg9r8kdghoem34rv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.tescon_app",
+            "certificate_hash": "86f7d411aa42b2b556c37dc8c38b3cbb85a41c7c"
+          }
+        },
+        {
           "client_id": "374173067582-houqmep2k8skd1e3qt69u2grddqqbcph.apps.googleusercontent.com",
           "client_type": 3
         }
