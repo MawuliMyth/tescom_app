@@ -117,11 +117,6 @@ class _SettingsPageState extends State<_SettingsPage> {
                     value: biometricUnlock,
                     onChanged: (value) => _setBiometricUnlock(value),
                   ),
-                  const _SettingsValueRow(
-                    icon: Icons.language_rounded,
-                    title: 'Language',
-                    value: 'English',
-                  ),
                 ],
               ),
               const SizedBox(height: 18),
@@ -548,14 +543,12 @@ class _SettingsValueRow extends StatelessWidget {
   const _SettingsValueRow({
     required this.icon,
     required this.title,
-    this.value,
     this.destructive = false,
     this.onTap,
   });
 
   final IconData icon;
   final String title;
-  final String? value;
   final bool destructive;
   final VoidCallback? onTap;
 
@@ -569,17 +562,6 @@ class _SettingsValueRow extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (value != null)
-            Text(
-              value!,
-              style: GoogleFonts.inter(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0,
-              ),
-            ),
-          const SizedBox(width: 4),
           Icon(
             Icons.chevron_right_rounded,
             color: destructive

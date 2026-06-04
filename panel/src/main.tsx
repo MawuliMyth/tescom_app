@@ -32,7 +32,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 import "./styles.css";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+const API_URL =
+  import.meta.env.VITE_API_URL ?? "https://backend-tawny-delta-99.vercel.app";
 const sessionExpiredEvent = "tescon_admin_session_expired";
 let adminRefreshInFlight: Promise<void> | null = null;
 

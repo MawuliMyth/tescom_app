@@ -131,12 +131,10 @@ class _ChaptersPage extends StatelessWidget {
       eventsCount: chapterEvents.isEmpty
           ? chapter.eventsCount
           : chapterEvents.length,
-      newsCount: 0,
       description:
           chapter.description ?? 'No chapter description has been added yet.',
       executives: chapterExecutives,
       members: chapterMembers,
-      news: const [],
       events: chapterEvents,
     );
   }
@@ -168,11 +166,9 @@ class _CampusChapter {
     required this.membersCount,
     required this.executivesCount,
     required this.eventsCount,
-    required this.newsCount,
     required this.description,
     required this.executives,
     required this.members,
-    required this.news,
     required this.events,
   });
 
@@ -183,25 +179,10 @@ class _CampusChapter {
   final int membersCount;
   final int executivesCount;
   final int eventsCount;
-  final int newsCount;
   final String description;
   final List<_Member> executives;
   final List<_Member> members;
-  final List<_ChapterUpdate> news;
   final List<_ChapterEvent> events;
-}
-
-// Small content model used for campus news cards.
-class _ChapterUpdate {
-  const _ChapterUpdate({
-    required this.title,
-    required this.source,
-    required this.date,
-  });
-
-  final String title;
-  final String source;
-  final String date;
 }
 
 // Small content model used for campus event cards.
@@ -346,12 +327,6 @@ class _CampusChapterDetailPage extends StatelessWidget {
                 title: 'Members',
                 children: chapter.members
                     .map((member) => _MemberCard(member: member))
-                    .toList(),
-              ),
-              _ChapterSection(
-                title: 'News',
-                children: chapter.news
-                    .map((item) => _ChapterNewsTile(item: item))
                     .toList(),
               ),
               _ChapterSection(
@@ -518,7 +493,6 @@ class _ChapterTabStrip extends StatelessWidget {
     final tabs = [
       'Executives ${chapter.executivesCount}',
       'Members ${chapter.membersCount}',
-      'News ${chapter.newsCount}',
       'Events ${chapter.eventsCount}',
     ];
 
@@ -634,62 +608,6 @@ class _ChapterSection extends StatelessWidget {
             )
           else
             ...children,
-        ],
-      ),
-    );
-  }
-}
-
-// Compact campus news tile.
-class _ChapterNewsTile extends StatelessWidget {
-  const _ChapterNewsTile({required this.item});
-
-  final _ChapterUpdate item;
-
-  @override
-  Widget build(BuildContext context) {
-    return _AppSurface(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      borderRadius: 18,
-      opacity: 0.68,
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 22,
-            backgroundColor: Color(0xFFEFEFFC),
-            child: Icon(Icons.article_outlined, color: Color(0xFF34368C)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    color: Colors.black,
-                    fontSize: 13,
-                    height: 1.25,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  '${item.source} - ${item.date}',
-                  style: GoogleFonts.inter(
-                    color: const Color(0xFF777777),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
