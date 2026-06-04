@@ -168,49 +168,76 @@ class _ConversationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final latest = conversation.latestMessage;
-    return ListTile(
-      tileColor: Colors.white,
-      leading: const CircleAvatar(
-        backgroundColor: Color(0xFFE8ECFF),
-        backgroundImage: AssetImage('assets/images/logo.png'),
-      ),
-      title: Text(
-        conversation.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: GoogleFonts.inter(
-          fontSize: 15,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0,
-        ),
-      ),
-      subtitle: Text(
-        _latestMessagePreview(latest),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: GoogleFonts.inter(
-          color: const Color(0xFF64748B),
-          fontSize: 12,
-          letterSpacing: 0,
-        ),
-      ),
-      trailing: Text(
-        _chatTime(latest?.createdAt ?? conversation.updatedAt),
-        style: GoogleFonts.inter(
-          color: const Color(0xFF94A3B8),
-          fontSize: 11,
-          letterSpacing: 0,
-        ),
-      ),
-      onTap: () {
-        Navigator.push(
-          context,
-          _adaptivePageRoute(
+    return Material(
+      color: Colors.white,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
             context,
-            builder: (_) => _ChatThreadPage(conversation: conversation),
+            _adaptivePageRoute(
+              context,
+              builder: (_) => _ChatThreadPage(conversation: conversation),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const CircleAvatar(
+                radius: 22,
+                backgroundColor: Color(0xFFE8ECFF),
+                backgroundImage: AssetImage('assets/images/logo.png'),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      conversation.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _latestMessagePreview(latest),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF64748B),
+                        fontSize: 12,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 42,
+                child: Text(
+                  _chatTime(latest?.createdAt ?? conversation.updatedAt),
+                  maxLines: 1,
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.clip,
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF94A3B8),
+                    fontSize: 11,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -373,61 +400,67 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.74,
-        ),
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
-          color: isMe ? const Color(0xFFE8ECFF) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isMe)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  message.author?.fullName ?? 'Member',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = (constraints.maxWidth * 0.74).clamp(150.0, 320.0);
+        return Align(
+          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: isMe ? const Color(0xFFE8ECFF) : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!isMe)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      message.author?.fullName ?? 'Member',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF34368C),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ),
+                Text(
+                  _wrapChatText(_messageText(message)),
+                  softWrap: true,
+                  overflow: TextOverflow.visible,
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF34368C),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    color: Colors.black,
+                    fontSize: 14,
+                    height: 1.35,
                     letterSpacing: 0,
                   ),
                 ),
-              ),
-            Text(
-              _messageText(message),
-              style: GoogleFonts.inter(
-                color: Colors.black,
-                fontSize: 14,
-                height: 1.35,
-                letterSpacing: 0,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                _chatTime(message.createdAt),
-                style: GoogleFonts.inter(
-                  color: const Color(0xFF94A3B8),
-                  fontSize: 10,
-                  letterSpacing: 0,
+                const SizedBox(height: 3),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    _chatTime(message.createdAt),
+                    maxLines: 1,
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF94A3B8),
+                      fontSize: 10,
+                      letterSpacing: 0,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -450,41 +483,34 @@ class _MessageInput extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
         color: Colors.white,
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                minLines: 1,
-                maxLines: 3,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  hintText: 'Type a message',
-                  filled: true,
-                  fillColor: const Color(0xFFF1F5F9),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
+        child: TextField(
+          controller: controller,
+          minLines: 1,
+          maxLines: 3,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+            hintText: 'Type a message',
+            filled: true,
+            fillColor: const Color(0xFFF1F5F9),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 10,
+            ),
+            suffixIcon: SizedBox(
+              width: 48,
+              child: IconButton(
+                onPressed: sending ? null : onSend,
+                icon: Icon(
+                  sending ? Icons.hourglass_top_rounded : Icons.send_rounded,
+                  color: const Color(0xFF34368C),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              style: IconButton.styleFrom(
-                backgroundColor: const Color(0xFF34368C),
-                foregroundColor: Colors.white,
-              ),
-              onPressed: sending ? null : onSend,
-              icon: Icon(
-                sending ? Icons.hourglass_top_rounded : Icons.send_rounded,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -547,6 +573,21 @@ String _messageText(AppMessage message) {
 String _latestMessagePreview(AppMessage? message) {
   if (message == null) return 'No messages yet';
   return _messageText(message);
+}
+
+String _wrapChatText(String value) {
+  return value
+      .split(' ')
+      .map((word) {
+        if (word.length <= 28) return word;
+        final chunks = <String>[];
+        for (var index = 0; index < word.length; index += 18) {
+          final end = (index + 18).clamp(0, word.length);
+          chunks.add(word.substring(index, end));
+        }
+        return chunks.join(' ');
+      })
+      .join(' ');
 }
 
 String _chatError(Object error) {
