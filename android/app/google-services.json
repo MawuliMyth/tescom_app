@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "374173067582",
+    "project_id": "tescon-f9231",
+    "storage_bucket": "tescon-f9231.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:374173067582:android:7167da948c56cbd14c646f",
+        "android_client_info": {
+          "package_name": "com.example.tescon_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "374173067582-houqmep2k8skd1e3qt69u2grddqqbcph.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvbwcbj55UKhUxP8FaNYZX3G8chLoFIFQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "374173067582-houqmep2k8skd1e3qt69u2grddqqbcph.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
