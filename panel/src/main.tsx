@@ -1891,7 +1891,7 @@ function normalizePayload(form: Record<string, unknown>, fields: Field[]) {
 }
 
 function defaultFormFor(resource: Resource) {
-  return resource.key === "events" ? { status: "PUBLISHED" } : {};
+  return ["events", "polls"].includes(resource.key) ? { status: "PUBLISHED" } : {};
 }
 
 function toEditableForm(row: AdminRecord, fields: Field[]) {

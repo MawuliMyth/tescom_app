@@ -298,7 +298,7 @@ const adminSchemas = {
     create: z.object({
       question: z.string().min(2),
       description: z.string().optional(),
-      status: publishStatusSchema.default("DRAFT"),
+      status: publishStatusSchema.default("PUBLISHED"),
       closesAt: optionalDateSchema,
       visibility: z.string().min(2).default("members"),
       allowMultipleVotes: z.boolean().default(false)
@@ -485,6 +485,31 @@ app.get("/api/auth/me", requireAuth, asyncHandler(async (req, res) => {
     select: publicUserSelect
   });
   res.json({ user });
+}));
+
+app.post("/api/auth/change-password", requireAuth, asyncHandler(async (req, res) => {
+  const body = z.object({
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(8)
+  }).parse(req.body);
+
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+  if (!user || !(await verifyPassword(body.currentPassword, user.passwordHash))) {
+    return res.status(401).json({ message: "Current password is incorrect" });
+  }
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: req.user!.id },
+      data: { passwordHash: await hashPassword(body.newPassword) }
+    }),
+    prisma.refreshToken.updateMany({
+      where: { userId: req.user!.id, revokedAt: null },
+      data: { revokedAt: new Date() }
+    })
+  ]);
+
+  res.status(204).send();
 }));
 
 app.get("/api/app/bootstrap", asyncHandler(async (_req, res) => {

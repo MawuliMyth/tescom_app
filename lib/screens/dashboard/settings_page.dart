@@ -12,7 +12,44 @@ class _SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<_SettingsPage> {
   bool notifications = true;
-  bool faceId = true;
+  final settingsService = AppSettingsService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final enabled = await settingsService.notificationsEnabled();
+    if (!mounted) return;
+    setState(() => notifications = enabled);
+  }
+
+  Future<void> _setNotifications(bool value) async {
+    setState(() => notifications = value);
+    await settingsService.setNotificationsEnabled(value);
+  }
+
+  Future<void> _clearImageCache() async {
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Image cache cleared')));
+  }
+
+  Future<void> _openChangePassword() async {
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (_) => const _ChangePasswordDialog(),
+    );
+    if (!mounted || changed != true) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Password updated successfully')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +75,7 @@ class _SettingsPageState extends State<_SettingsPage> {
                     icon: Icons.notifications_none_rounded,
                     title: 'Notifications and sounds',
                     value: notifications,
-                    onChanged: (value) => setState(() => notifications = value),
+                    onChanged: (value) => _setNotifications(value),
                   ),
                   const _SettingsValueRow(
                     icon: Icons.language_rounded,
@@ -51,15 +88,10 @@ class _SettingsPageState extends State<_SettingsPage> {
               _SettingsSection(
                 title: 'Account',
                 children: [
-                  const _SettingsValueRow(
+                  _SettingsValueRow(
                     icon: Icons.lock_outline_rounded,
                     title: 'Password',
-                  ),
-                  _SettingsToggleRow(
-                    icon: Icons.face_retouching_natural_outlined,
-                    title: 'Login with Face ID',
-                    value: faceId,
-                    onChanged: (value) => setState(() => faceId = value),
+                    onTap: _openChangePassword,
                   ),
                   _SettingsValueRow(
                     icon: Icons.support_agent_rounded,
@@ -72,9 +104,10 @@ class _SettingsPageState extends State<_SettingsPage> {
                       ),
                     ),
                   ),
-                  const _SettingsValueRow(
+                  _SettingsValueRow(
                     icon: Icons.cleaning_services_outlined,
                     title: 'Clear cache',
+                    onTap: _clearImageCache,
                   ),
                   _SettingsValueRow(
                     icon: Icons.privacy_tip_outlined,
@@ -140,6 +173,140 @@ class _SettingsHeader extends StatelessWidget {
       ],
     );
   }
+}
+
+class _ChangePasswordDialog extends StatefulWidget {
+  const _ChangePasswordDialog();
+
+  @override
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  final formKey = GlobalKey<FormState>();
+  final currentController = TextEditingController();
+  final newController = TextEditingController();
+  final confirmController = TextEditingController();
+  bool saving = false;
+  String? error;
+
+  @override
+  void dispose() {
+    currentController.dispose();
+    newController.dispose();
+    confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> submit() async {
+    if (!formKey.currentState!.validate() || saving) return;
+    setState(() {
+      saving = true;
+      error = null;
+    });
+
+    try {
+      await AppRepository().changePassword(
+        currentPassword: currentController.text,
+        newPassword: newController.text,
+      );
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (exception) {
+      if (!mounted) return;
+      setState(() {
+        error = _friendlyError(exception);
+        saving = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Change password'),
+      content: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: currentController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Current password',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Enter your current password';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: newController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'New password',
+                border: OutlineInputBorder(),
+              ),
+              validator: _validateNewPassword,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: confirmController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Confirm password',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value != newController.text) {
+                  return 'Passwords do not match';
+                }
+                return null;
+              },
+            ),
+            if (error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                error!,
+                style: GoogleFonts.inter(
+                  color: const Color(0xFFE54848),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: saving ? null : () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: saving ? null : submit,
+          child: Text(saving ? 'Saving...' : 'Save'),
+        ),
+      ],
+    );
+  }
+}
+
+String? _validateNewPassword(String? value) {
+  final password = value ?? '';
+  if (password.isEmpty) return 'Enter a new password';
+  if (password.length < 8) return 'Password must be at least 8 characters';
+  if (!RegExp(r'[A-Za-z]').hasMatch(password) ||
+      !RegExp(r'\d').hasMatch(password)) {
+    return 'Use letters and numbers';
+  }
+  return null;
 }
 
 // Profile block shown at the top of settings.

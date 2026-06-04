@@ -9,8 +9,8 @@ class _PollsPage extends StatefulWidget {
 }
 
 class _PollsPageState extends State<_PollsPage> {
-  String selectedTab = 'Polls';
-  String? selectedOption;
+  String selectedTab = 'Active';
+  final Map<String, String> selectedOptions = {};
 
   @override
   Widget build(BuildContext context) {
@@ -37,29 +37,44 @@ class _PollsPageState extends State<_PollsPage> {
                   }
                   if (snapshot.hasError) return const _InlineErrorState();
 
-                  final polls = snapshot.data?.polls ?? const [];
-                  if (polls.isEmpty) {
-                    return const _InfoCard(
-                      item: _InfoItem(
-                        title: 'No polls yet',
-                        subtitle: 'Admin dashboard',
-                        body: 'Published polls will appear here.',
-                        icon: Icons.poll_outlined,
-                      ),
-                    );
-                  }
+                  final polls = _pollsForTab(
+                    snapshot.data?.polls ?? const [],
+                    selectedTab,
+                  );
+                  if (polls.isEmpty) return _emptyPollState(selectedTab);
 
-                  final poll = polls.first;
-                  return _PollActivityCard(
-                    poll: poll,
-                    selectedOption: selectedOption,
-                    onSelected: (value) async {
-                      setState(() => selectedOption = value);
-                      await AppRepository().voteInPoll(
-                        pollId: poll.id,
-                        optionId: value,
+                  return Column(
+                    children: polls.map((poll) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: _PollActivityCard(
+                          poll: poll,
+                          selectedOption: selectedOptions[poll.id],
+                          onSelected: (value) async {
+                            final previousValue = selectedOptions[poll.id];
+                            setState(() => selectedOptions[poll.id] = value);
+                            try {
+                              await AppRepository().voteInPoll(
+                                pollId: poll.id,
+                                optionId: value,
+                              );
+                            } catch (error) {
+                              if (!context.mounted) return;
+                              setState(() {
+                                if (previousValue == null) {
+                                  selectedOptions.remove(poll.id);
+                                } else {
+                                  selectedOptions[poll.id] = previousValue;
+                                }
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(_friendlyError(error))),
+                              );
+                            }
+                          },
+                        ),
                       );
-                    },
+                    }).toList(),
                   );
                 },
               ),
@@ -81,6 +96,35 @@ class _PollOption {
   final String id;
   final String label;
   final int percent;
+}
+
+List<AppPoll> _pollsForTab(List<AppPoll> polls, String tab) {
+  final now = DateTime.now();
+  final active = polls.where((poll) {
+    return poll.closesAt == null || poll.closesAt!.isAfter(now);
+  }).toList();
+  final completed = polls.where((poll) {
+    return poll.closesAt != null && !poll.closesAt!.isAfter(now);
+  }).toList();
+
+  return switch (tab) {
+    'Completed' || 'Results' => completed,
+    _ => active,
+  };
+}
+
+Widget _emptyPollState(String tab) {
+  final completed = tab == 'Completed' || tab == 'Results';
+  return _InfoCard(
+    item: _InfoItem(
+      title: completed ? 'No completed polls yet' : 'No active polls yet',
+      subtitle: 'Admin dashboard',
+      body: completed
+          ? 'Closed poll results will appear here.'
+          : 'Published polls that have not closed will appear here.',
+      icon: Icons.poll_outlined,
+    ),
+  );
 }
 
 // Top bar for the polls area.
@@ -252,6 +296,11 @@ class _PollActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final totalVotes = poll.options.fold<int>(
+      0,
+      (total, option) => total + option.voteCount,
+    );
+
     return _AppSurface(
       padding: const EdgeInsets.all(16),
       borderRadius: 22,
@@ -320,7 +369,9 @@ class _PollActivityCard extends StatelessWidget {
             final pollOption = _PollOption(
               id: option.id,
               label: option.text,
-              percent: option.voteCount,
+              percent: totalVotes == 0
+                  ? 0
+                  : ((option.voteCount / totalVotes) * 100).round(),
             );
             final isSelected = selectedOption == option.id;
             final value = isSelected ? 100 : pollOption.percent;

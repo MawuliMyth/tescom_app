@@ -51,6 +51,16 @@ class AppRepository {
     await _apiClient.patch('/api/app/notifications/$id/read');
   }
 
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _apiClient.post(
+      '/api/auth/change-password',
+      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+    );
+  }
+
   Future<List<AppConversation>> loadConversations() async {
     final data = await _apiClient.get('/api/app/conversations');
     return _list(data['conversations'], AppConversation.fromJson);
