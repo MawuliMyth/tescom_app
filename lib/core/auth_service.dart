@@ -1,5 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
 import 'api_client.dart';
 import 'auth_tokens.dart';
+import 'push_notification_service.dart';
 import 'token_storage.dart';
 
 class AuthService {
@@ -12,6 +16,7 @@ class AuthService {
 
   final ApiClient _apiClient;
   final TokenStorage _tokenStorage;
+  static Future<void>? _googleInitFuture;
 
   Future<bool> hasSession() async {
     if (!await _tokenStorage.hasRefreshSession()) return false;
@@ -36,6 +41,40 @@ class AuthService {
       '/api/auth/login',
       auth: false,
       body: {'email': email, 'password': password},
+    );
+    await _saveTokens(data);
+  }
+
+  Future<void> signInWithGoogle() async {
+    if (!await PushNotificationService.ensureFirebaseInitialized()) {
+      throw const ApiException('Firebase is not configured for this app yet');
+    }
+
+    _googleInitFuture ??= GoogleSignIn.instance.initialize();
+    await _googleInitFuture;
+    if (!GoogleSignIn.instance.supportsAuthenticate()) {
+      throw const ApiException('Google sign-in is not supported here');
+    }
+
+    final googleUser = await GoogleSignIn.instance.authenticate();
+    final googleIdToken = googleUser.authentication.idToken;
+    if (googleIdToken == null) {
+      throw const ApiException('Google did not return a sign-in token');
+    }
+
+    final credential = GoogleAuthProvider.credential(idToken: googleIdToken);
+    final firebaseUser = await FirebaseAuth.instance.signInWithCredential(
+      credential,
+    );
+    final firebaseIdToken = await firebaseUser.user?.getIdToken();
+    if (firebaseIdToken == null) {
+      throw const ApiException('Firebase did not return a sign-in token');
+    }
+
+    final data = await _apiClient.post(
+      '/api/auth/firebase',
+      auth: false,
+      body: {'idToken': firebaseIdToken},
     );
     await _saveTokens(data);
   }
@@ -69,6 +108,10 @@ class AuthService {
           : {'refreshToken': refreshToken};
       await _apiClient.post('/api/auth/logout', body: body);
     } finally {
+      try {
+        await FirebaseAuth.instance.signOut();
+        await GoogleSignIn.instance.signOut();
+      } catch (_) {}
       await _tokenStorage.clear();
     }
   }

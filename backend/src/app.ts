@@ -3,6 +3,7 @@ import express from "express";
 import multer from "multer";
 import { put } from "@vercel/blob";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getMessaging } from "firebase-admin/messaging";
 import {
   PrismaClientInitializationError,
@@ -451,6 +452,44 @@ app.post("/api/auth/login", asyncHandler(async (req, res) => {
   const safeUser = toPublicUser(user);
   const tokens = await createSession(safeUser);
   return res.json({ user: safeUser, tokens });
+}));
+
+app.post("/api/auth/firebase", asyncHandler(async (req, res) => {
+  if (!firebaseReady) {
+    return res.status(503).json({ message: "Firebase authentication is not configured" });
+  }
+
+  const body = z.object({ idToken: z.string().min(10) }).parse(req.body);
+  const decoded = await getAuth().verifyIdToken(body.idToken);
+  if (!decoded.email) {
+    return res.status(400).json({ message: "Firebase account has no email address" });
+  }
+
+  const fullName =
+    typeof decoded.name === "string" && decoded.name.trim()
+      ? decoded.name.trim()
+      : decoded.email.split("@")[0];
+  const avatarUrl = typeof decoded.picture === "string" ? decoded.picture : undefined;
+
+  const user = await prisma.user.upsert({
+    where: { email: decoded.email },
+    update: {
+      fullName,
+      avatarUrl,
+      status: "ACTIVE"
+    },
+    create: {
+      email: decoded.email,
+      fullName,
+      avatarUrl,
+      status: "ACTIVE",
+      passwordHash: await hashPassword(createRefreshToken())
+    },
+    select: publicUserSelect
+  });
+
+  const tokens = await createSession(user);
+  return res.json({ user, tokens });
 }));
 
 app.post("/api/auth/refresh", asyncHandler(async (req, res) => {
