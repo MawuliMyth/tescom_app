@@ -527,17 +527,18 @@ class _MessageBubble extends StatelessWidget {
                       ),
                     ),
                   ),
-                Text(
-                  _wrapChatText(_messageText(message)),
-                  softWrap: true,
-                  overflow: TextOverflow.visible,
-                  style: GoogleFonts.inter(
-                    color: Colors.black,
-                    fontSize: 14,
-                    height: 1.35,
-                    letterSpacing: 0,
+                if (message.body.trim().isNotEmpty)
+                  Text(
+                    _wrapChatText(message.body.trim()),
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
+                    style: GoogleFonts.inter(
+                      color: Colors.black,
+                      fontSize: 14,
+                      height: 1.35,
+                      letterSpacing: 0,
+                    ),
                   ),
-                ),
                 if (_hasMedia(message)) ...[
                   if (message.body.trim().isNotEmpty) const SizedBox(height: 8),
                   _MessageMedia(message: message),
@@ -589,22 +590,28 @@ class _MessageInput extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            PopupMenuButton<String>(
-              tooltip: 'Attach media',
-              enabled: !sending,
-              icon: const Icon(
-                Icons.add_circle_outline_rounded,
-                color: Color(0xFF34368C),
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: PopupMenuButton<String>(
+                tooltip: 'Attach media',
+                enabled: !sending,
+                padding: EdgeInsets.zero,
+                icon: const Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: Color(0xFF34368C),
+                ),
+                onSelected: (value) {
+                  if (value == 'image') onAttachImage();
+                  if (value == 'video') onAttachVideo();
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'image', child: Text('Image')),
+                  PopupMenuItem(value: 'video', child: Text('Video')),
+                ],
               ),
-              onSelected: (value) {
-                if (value == 'image') onAttachImage();
-                if (value == 'video') onAttachVideo();
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'image', child: Text('Image')),
-                PopupMenuItem(value: 'video', child: Text('Video')),
-              ],
             ),
+            const SizedBox(width: 4),
             Expanded(
               child: TextField(
                 controller: controller,
@@ -626,12 +633,17 @@ class _MessageInput extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 6),
-            IconButton(
-              onPressed: sending ? null : onSend,
-              icon: Icon(
-                sending ? Icons.hourglass_top_rounded : Icons.send_rounded,
-                color: const Color(0xFF34368C),
+            const SizedBox(width: 4),
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                onPressed: sending ? null : onSend,
+                icon: Icon(
+                  sending ? Icons.hourglass_top_rounded : Icons.send_rounded,
+                  color: const Color(0xFF34368C),
+                ),
               ),
             ),
           ],
@@ -653,15 +665,16 @@ class _MessageMedia extends StatelessWidget {
     if (_isImageMessage(message)) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: CachedNetworkImage(
-          imageUrl: ApiConfig.mediaUrl(url),
-          width: double.infinity,
-          fit: BoxFit.cover,
-          placeholder: (_, _) =>
-              const SizedBox(height: 150, child: _ListShimmer(itemCount: 1)),
-          errorWidget: (_, _, _) => const SizedBox(
-            height: 120,
-            child: Center(child: Icon(Icons.broken_image_outlined)),
+        child: AspectRatio(
+          aspectRatio: 4 / 3,
+          child: CachedNetworkImage(
+            imageUrl: ApiConfig.mediaUrl(url),
+            width: double.infinity,
+            height: double.infinity,
+            fit: BoxFit.cover,
+            placeholder: (_, _) => const _ListShimmer(itemCount: 1),
+            errorWidget: (_, _, _) =>
+                const Center(child: Icon(Icons.broken_image_outlined)),
           ),
         ),
       );
