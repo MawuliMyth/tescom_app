@@ -178,76 +178,96 @@ class _ConversationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final latest = conversation.latestMessage;
-    return Material(
-      color: Colors.white,
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            _adaptivePageRoute(
-              context,
-              builder: (_) => _ChatThreadPage(conversation: conversation),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const CircleAvatar(
-                radius: 22,
-                backgroundColor: Color(0xFFE8ECFF),
-                backgroundImage: AssetImage('assets/images/logo.png'),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 330;
+        final avatarSize = compact ? 38.0 : 44.0;
+        final showTime = constraints.maxWidth >= 280;
+
+        return Material(
+          color: Colors.white,
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                _adaptivePageRoute(
+                  context,
+                  builder: (_) => _ChatThreadPage(conversation: conversation),
+                ),
+              );
+            },
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: compact ? 10 : 14,
+                vertical: 12,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      conversation.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0,
-                      ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: avatarSize,
+                    height: avatarSize,
+                    child: const CircleAvatar(
+                      backgroundColor: Color(0xFFE8ECFF),
+                      backgroundImage: AssetImage('assets/images/logo.png'),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _latestMessagePreview(latest),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        color: const Color(0xFF64748B),
-                        fontSize: 12,
-                        letterSpacing: 0,
+                  ),
+                  SizedBox(width: compact ? 8 : 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          conversation.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: compact ? 14 : 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _latestMessagePreview(latest),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFF64748B),
+                            fontSize: 12,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (showTime) ...[
+                    const SizedBox(width: 6),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minWidth: compact ? 34 : 42,
+                        maxWidth: compact ? 42 : 54,
+                      ),
+                      child: Text(
+                        _chatTime(latest?.createdAt ?? conversation.updatedAt),
+                        maxLines: 1,
+                        textAlign: TextAlign.right,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFF94A3B8),
+                          fontSize: compact ? 10 : 11,
+                          letterSpacing: 0,
+                        ),
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 42,
-                child: Text(
-                  _chatTime(latest?.createdAt ?? conversation.updatedAt),
-                  maxLines: 1,
-                  textAlign: TextAlign.right,
-                  overflow: TextOverflow.clip,
-                  style: GoogleFonts.inter(
-                    color: const Color(0xFF94A3B8),
-                    fontSize: 11,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
