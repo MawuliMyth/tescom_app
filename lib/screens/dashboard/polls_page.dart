@@ -442,27 +442,6 @@ class _PollActivityCard extends StatelessWidget {
           const Divider(height: 26, color: Color(0xFFE8E8EF)),
           Row(
             children: [
-              const Icon(
-                Icons.how_to_vote_outlined,
-                color: Color(0xFF34368C),
-                size: 18,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                '$totalVotes votes',
-                style: GoogleFonts.inter(fontSize: 11, letterSpacing: 0),
-              ),
-              const SizedBox(width: 18),
-              const Icon(
-                Icons.checklist_rounded,
-                color: Color(0xFF777777),
-                size: 17,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                '${poll.options.length} options',
-                style: GoogleFonts.inter(fontSize: 11, letterSpacing: 0),
-              ),
               const Spacer(),
               TextButton.icon(
                 onPressed: onShare,
