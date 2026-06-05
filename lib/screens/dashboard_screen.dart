@@ -58,7 +58,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     with WidgetsBindingObserver {
   final PersistentTabController _controller = PersistentTabController();
   bool _isDrawerOpen = false;
-  Timer? _autoRefreshTimer;
   int _refreshVersion = 0;
 
   @override
@@ -66,16 +65,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     PushNotificationService().initializeForSignedInUser();
-    _autoRefreshTimer = Timer.periodic(
-      const Duration(seconds: 60),
-      (_) => _refreshDashboardContent(),
-    );
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _autoRefreshTimer?.cancel();
     super.dispose();
   }
 

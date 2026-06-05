@@ -1107,13 +1107,62 @@ type NotificationPayload = {
   userId?: string | null;
 };
 
+type PushPayload = {
+  title: string;
+  body: string;
+  data: Record<string, string>;
+  userId?: string | null;
+};
+
 async function sendPushForNotification(notification: NotificationPayload) {
+  await sendPush({
+    title: notification.title,
+    body: notification.body,
+    userId: notification.userId,
+    data: {
+      type: "notification",
+      notificationId: notification.id
+    }
+  });
+}
+
+async function sendContentUpdatePush(resourceName: string, row: Record<string, unknown>) {
+  if (!shouldPushContentUpdate(resourceName, row)) return;
+  const label = resourceLabel(resourceName);
+  const title = String(row.title ?? row.question ?? label);
+  await sendPush({
+    title: `New ${label}`,
+    body: title,
+    data: {
+      type: "content_update",
+      resource: resourceName,
+      recordId: String(row.id ?? "")
+    }
+  });
+}
+
+function shouldPushContentUpdate(resourceName: string, row: Record<string, unknown>) {
+  if (!["news", "events", "announcements", "jobs", "polls"].includes(resourceName)) return false;
+  return row.status === "PUBLISHED";
+}
+
+function resourceLabel(resourceName: string) {
+  return ({
+    news: "news",
+    events: "event",
+    announcements: "announcement",
+    jobs: "job",
+    polls: "poll"
+  } as Record<string, string>)[resourceName] ?? "update";
+}
+
+async function sendPush(payload: PushPayload) {
   if (!firebaseReady) return;
 
   const tokens = await db.deviceToken.findMany({
     where: {
       enabled: true,
-      ...(notification.userId ? { userId: notification.userId } : {})
+      ...(payload.userId ? { userId: payload.userId } : {})
     },
     select: { id: true, token: true }
   });
@@ -1128,13 +1177,10 @@ async function sendPushForNotification(notification: NotificationPayload) {
     const response = await messaging.sendEachForMulticast({
       tokens: chunk.map((item: { token: string }) => item.token),
       notification: {
-        title: notification.title,
-        body: notification.body
+        title: payload.title,
+        body: payload.body
       },
-      data: {
-        type: "notification",
-        notificationId: notification.id
-      }
+      data: payload.data
     });
 
     response.responses.forEach((result, resultIndex) => {
@@ -1297,6 +1343,8 @@ for (const [name, config] of Object.entries(resources)) {
     }
     if (name === "notifications") {
       await sendPushForNotification(row);
+    } else {
+      await sendContentUpdatePush(name, row);
     }
     res.status(201).json({ row });
   }));

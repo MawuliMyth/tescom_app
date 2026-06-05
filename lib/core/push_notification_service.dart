@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'api_client.dart';
+import 'app_refresh_bus.dart';
 import 'app_settings_service.dart';
 
 @pragma('vm:entry-point')
@@ -47,7 +48,10 @@ class PushNotificationService {
     if (!await ensureFirebaseInitialized()) return;
     await _initializeLocalNotifications();
 
-    FirebaseMessaging.onMessage.listen(_showForegroundNotification);
+    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpened);
+    final initialMessage = await _messaging.getInitialMessage();
+    if (initialMessage != null) _handleMessageOpened(initialMessage);
     _messaging.onTokenRefresh.listen((token) async {
       if (await _settingsService.notificationsEnabled()) {
         await registerDeviceToken(token);
@@ -130,6 +134,20 @@ class PushNotificationService {
         ?.createNotificationChannel(channel);
 
     _localNotificationsInitialized = true;
+  }
+
+  void _handleMessageOpened(RemoteMessage message) {
+    if (_shouldRefreshFromMessage(message)) AppRefreshBus().refresh();
+  }
+
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    if (_shouldRefreshFromMessage(message)) AppRefreshBus().refresh();
+    await _showForegroundNotification(message);
+  }
+
+  bool _shouldRefreshFromMessage(RemoteMessage message) {
+    final type = message.data['type'];
+    return type == 'content_update' || type == 'notification';
   }
 
   Future<void> _showForegroundNotification(RemoteMessage message) async {
