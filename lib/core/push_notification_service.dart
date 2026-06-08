@@ -18,7 +18,7 @@ class PushNotificationService {
     FlutterLocalNotificationsPlugin? localNotifications,
     AppSettingsService? settingsService,
     ApiClient? apiClient,
-  }) : _messaging = messaging ?? FirebaseMessaging.instance,
+  }) : _messaging = messaging,
        _localNotifications =
            localNotifications ?? FlutterLocalNotificationsPlugin(),
        _settingsService = settingsService ?? AppSettingsService(),
@@ -27,7 +27,7 @@ class PushNotificationService {
   static bool _firebaseInitialized = false;
   static bool _localNotificationsInitialized = false;
 
-  final FirebaseMessaging _messaging;
+  final FirebaseMessaging? _messaging;
   final FlutterLocalNotificationsPlugin _localNotifications;
   final AppSettingsService _settingsService;
   final ApiClient _apiClient;
@@ -48,11 +48,12 @@ class PushNotificationService {
     if (!await ensureFirebaseInitialized()) return;
     await _initializeLocalNotifications();
 
+    final messaging = _messaging ?? FirebaseMessaging.instance;
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpened);
-    final initialMessage = await _messaging.getInitialMessage();
+    final initialMessage = await messaging.getInitialMessage();
     if (initialMessage != null) _handleMessageOpened(initialMessage);
-    _messaging.onTokenRefresh.listen((token) async {
+    messaging.onTokenRefresh.listen((token) async {
       if (await _settingsService.notificationsEnabled()) {
         await registerDeviceToken(token);
       }
@@ -66,14 +67,15 @@ class PushNotificationService {
   Future<void> enableNotifications() async {
     if (!await ensureFirebaseInitialized()) return;
     await _settingsService.setNotificationsEnabled(true);
-    final settings = await _messaging.requestPermission(
+    final messaging = _messaging ?? FirebaseMessaging.instance;
+    final settings = await messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
     if (settings.authorizationStatus == AuthorizationStatus.denied) return;
 
-    final token = await _messaging.getToken();
+    final token = await messaging.getToken();
     if (token != null) await registerDeviceToken(token);
   }
 
@@ -81,7 +83,8 @@ class PushNotificationService {
     await _settingsService.setNotificationsEnabled(false);
     if (!await ensureFirebaseInitialized()) return;
 
-    final token = await _messaging.getToken();
+    final messaging = _messaging ?? FirebaseMessaging.instance;
+    final token = await messaging.getToken();
     if (token == null) return;
     try {
       await _apiClient.post(

@@ -159,14 +159,46 @@ class _ListShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: List.generate(
-        itemCount,
-        (index) => const _ShimmerBlock(
-          height: 92,
-          borderRadius: 18,
-          margin: EdgeInsets.only(bottom: 12),
-        ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final children = List.generate(
+          itemCount,
+          (index) => const _ShimmerBlock(
+            height: 92,
+            borderRadius: 18,
+            margin: EdgeInsets.only(bottom: 12),
+          ),
+        );
+
+        if (!constraints.hasBoundedHeight) {
+          return Column(children: children);
+        }
+
+        return ListView(
+          padding: EdgeInsets.zero,
+          physics: const NeverScrollableScrollPhysics(),
+          children: children,
+        );
+      },
+    );
+  }
+}
+
+class _ChatListShimmer extends StatelessWidget {
+  const _ChatListShimmer({this.itemCount = 6});
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(18),
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: itemCount,
+      itemBuilder: (context, index) => const _ShimmerBlock(
+        height: 92,
+        borderRadius: 18,
+        margin: EdgeInsets.only(bottom: 12),
       ),
     );
   }

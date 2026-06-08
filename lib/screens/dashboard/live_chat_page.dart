@@ -87,10 +87,7 @@ class _LiveChatPageState extends State<_LiveChatPage> {
         future: conversationsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Padding(
-              padding: EdgeInsets.all(18),
-              child: _ListShimmer(itemCount: 6),
-            );
+            return const _ChatListShimmer(itemCount: 6);
           }
           if (snapshot.hasError) return const _InlineErrorState();
 
@@ -455,10 +452,7 @@ class _ChatThreadPageState extends State<_ChatThreadPage> {
                   future: messagesFuture,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Padding(
-                        padding: EdgeInsets.all(18),
-                        child: _ListShimmer(itemCount: 6),
-                      );
+                      return const _ChatListShimmer(itemCount: 6);
                     }
                     if (snapshot.hasError) return const _InlineErrorState();
 
