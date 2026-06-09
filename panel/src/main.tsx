@@ -957,6 +957,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
   const [rows, setRows] = useState<AdminRecord[]>([]);
   const [chapterOptions, setChapterOptions] = useState<SelectOption[]>([]);
   const [editing, setEditing] = useState<AdminRecord | null>(null);
+  const [statsPoll, setStatsPoll] = useState<AdminRecord | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [form, setForm] = useState<Record<string, unknown>>(() => defaultFormFor(resource));
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -983,6 +984,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
 
   useEffect(() => {
     setEditing(null);
+    setStatsPoll(null);
     setEditorOpen(false);
     setFilters({});
     setForm(defaultFormFor(resource));
@@ -1166,7 +1168,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
                     <td>{row.organizationRole ? <StatusPill value={row.organizationRole} /> : "No position"}</td>
                   )}
                   {resource.key === "polls" && (
-                    <td>{pollFeedback(row)}</td>
+                    <td>{pollFeedback(row, () => setStatsPoll(row))}</td>
                   )}
                   <td><StatusPill value={row.status ?? (row.resolved ? "Resolved" : "Open")} /></td>
                   <td>{formatDate(row.updatedAt ?? row.createdAt)}</td>
@@ -1234,6 +1236,9 @@ function ResourceManager({ resource }: { resource: Resource }) {
           </form>
         </div>
       )}
+      {statsPoll && (
+        <PollStatsModal poll={statsPoll} onClose={() => setStatsPoll(null)} />
+      )}
       </section>
     </PullToRefresh>
   );
@@ -1289,7 +1294,7 @@ function recordSubtitle(row: AdminRecord) {
   return row.summary ?? row.description ?? row.email ?? row.company ?? row.institution ?? row.organizationRole ?? row.body ?? "";
 }
 
-function pollFeedback(row: AdminRecord) {
+function pollFeedback(row: AdminRecord, onOpen: () => void) {
   const options = Array.isArray(row.options) ? row.options : [];
   const totalVotes = options.reduce((total, option) => total + (option._count?.votes ?? 0), 0);
   if (!options.length) {
@@ -1297,24 +1302,67 @@ function pollFeedback(row: AdminRecord) {
   }
 
   return (
-    <div className="poll-feedback">
-      <strong>{totalVotes} response{totalVotes === 1 ? "" : "s"}</strong>
-      {options.map((option, index) => {
-        const votes = option._count?.votes ?? 0;
-        const percent = totalVotes ? Math.round((votes / totalVotes) * 100) : 0;
-        return (
-          <div className="poll-feedback-row" key={option.id ?? `${option.text}-${index}`}>
-            <span>{option.text ?? "Untitled option"}</span>
-            <div className="poll-feedback-meter" aria-label={`${percent}%`}>
-              <i style={{ width: `${percent}%` }} />
-            </div>
-            <em>{votes} / {percent}%</em>
-          </div>
-        );
-      })}
+    <div className="poll-feedback-compact">
+      <strong>{totalVotes}</strong>
+      <span>response{totalVotes === 1 ? "" : "s"}</span>
+      <ActionButton icon={BarChart3} variant="ghost" className="stats-button" onClick={onOpen}>
+        View stats
+      </ActionButton>
     </div>
   );
 }
+
+function PollStatsModal({ poll, onClose }: { poll: AdminRecord; onClose: () => void }) {
+  const options = Array.isArray(poll.options) ? poll.options : [];
+  const totalVotes = options.reduce((total, option) => total + (option._count?.votes ?? 0), 0);
+
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <section className="poll-stats-modal">
+        <div className="panel-title">
+          <div>
+            <span>Poll feedback</span>
+            <h2>{recordTitle(poll)}</h2>
+          </div>
+          <IconButton icon={X} label="Close poll statistics" onClick={onClose} />
+        </div>
+        <div className="poll-stats-summary">
+          <div>
+            <strong>{totalVotes}</strong>
+            <span>Total responses</span>
+          </div>
+          <StatusPill value={poll.status ?? "Published"} />
+        </div>
+        <div className="poll-stat-grid">
+          {options.map((option, index) => {
+            const votes = option._count?.votes ?? 0;
+            const percent = totalVotes ? Math.round((votes / totalVotes) * 100) : 0;
+            const accent = pollStatColors[index % pollStatColors.length];
+            return (
+              <article className="poll-stat-card" key={option.id ?? `${option.text}-${index}`}>
+                <div className="poll-stat-ring" style={{ "--value": `${percent * 3.6}deg`, "--accent": accent } as React.CSSProperties}>
+                  <span>{percent}%</span>
+                </div>
+                <div>
+                  <strong>{option.text ?? "Untitled option"}</strong>
+                  <span>{votes} vote{votes === 1 ? "" : "s"}</span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+        {!options.length && (
+          <EmptyState
+            title="No options added"
+            message="Add poll options before expecting feedback from members."
+          />
+        )}
+      </section>
+    </div>
+  );
+}
+
+const pollStatColors = ["#34368c", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#0ea5e9"];
 
 function filterValueFor(row: AdminRecord, key: string) {
   if (key === "campus") return String(row.institution ?? row.name ?? row.job?.institution ?? "");

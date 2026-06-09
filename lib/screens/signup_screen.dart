@@ -18,26 +18,90 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _institutionController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  String? selectedInstitution;
   bool _isSubmitting = false;
   String? _errorMessage;
 
   final institutions = const [
+    'UG',
     'University of Ghana',
     'KNUST',
+    'Kwame Nkrumah University of Science and Technology',
+    'UCC',
     'University of Cape Coast',
+    'UEW',
+    'University of Education, Winneba',
+    'UDS',
+    'University for Development Studies',
+    'UHAS',
+    'University of Health and Allied Sciences',
+    'UENR',
+    'University of Energy and Natural Resources',
+    'UMaT',
+    'University of Mines and Technology',
+    'SD Dombo University of Business and Integrated Development Studies',
+    'C. K. Tedam University of Technology and Applied Sciences',
+    'Akenten Appiah-Menka University of Skills Training and Entrepreneurial Development',
     'UPSA',
     'GIMPA',
+    'Ghana Communication Technology University',
+    'Ghana Institute of Journalism',
+    'Ghana Institute of Languages',
+    'Accra Technical University',
+    'Kumasi Technical University',
+    'Takoradi Technical University',
+    'Koforidua Technical University',
+    'Ho Technical University',
+    'Cape Coast Technical University',
+    'Tamale Technical University',
+    'Sunyani Technical University',
+    'Bolgatanga Technical University',
+    'Wa Technical University',
+    'Akatsi Technical Institute',
+    'Ashesi University',
+    'Central University',
+    'Valley View University',
+    'Pentecost University',
+    'Methodist University Ghana',
+    'Presbyterian University Ghana',
+    'Catholic University of Ghana',
+    'Regent University College of Science and Technology',
+    'Wisconsin International University College',
+    'Lancaster University Ghana',
+    'Academic City University College',
+    'Ghana Christian University College',
+    'African University College of Communications',
+    'BlueCrest University College',
+    'Knutsford University College',
+    'Garden City University College',
+    'Radford University College',
+    'Zenith University College',
+    'Islamic University College Ghana',
+    'All Nations University',
+    'Data Link Institute',
+    'University College of Management Studies',
+    'Perez University College',
+    'Webster University Ghana',
+    'KAAF University College',
+    'Mountcrest University College',
+    'Spiritan University College',
+    'Ensign Global College',
+    'Ghana Baptist University College',
+    'Maranatha University College',
+    'Nightingale School of Nursing',
+    'Korle Bu Nursing and Midwifery Training College',
+    '37 Military Hospital Nursing and Midwifery Training College',
   ];
 
   @override
   void dispose() {
     _fullNameController.dispose();
     _phoneController.dispose();
+    _institutionController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -57,7 +121,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       await _authService.signUp(
         fullName: _fullNameController.text.trim(),
         phone: _phoneController.text.trim(),
-        institution: selectedInstitution ?? '',
+        institution: _institutionController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
@@ -119,13 +183,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         const SizedBox(height: 16),
                         _PhoneInput(controller: _phoneController),
                         const SizedBox(height: 16),
-                        _InstitutionDropdown(
-                          value: selectedInstitution,
+                        _InstitutionAutocomplete(
+                          controller: _institutionController,
                           institutions: institutions,
                           validator: _validateInstitution,
-                          onChanged: (value) {
-                            setState(() => selectedInstitution = value);
-                          },
                         ),
                         const SizedBox(height: 16),
                         _SignUpInput(
@@ -238,7 +299,9 @@ String? _validatePhone(String? value) {
 }
 
 String? _validateInstitution(String? value) {
-  if (value == null || value.trim().isEmpty) return 'Choose your institution';
+  final institution = value?.trim() ?? '';
+  if (institution.isEmpty) return 'Enter your institution';
+  if (institution.length < 3) return 'Enter a valid institution name';
   return null;
 }
 
@@ -402,63 +465,143 @@ class _PhoneInput extends StatelessWidget {
   }
 }
 
-class _InstitutionDropdown extends StatelessWidget {
-  const _InstitutionDropdown({
-    required this.value,
+class _InstitutionAutocomplete extends StatefulWidget {
+  const _InstitutionAutocomplete({
+    required this.controller,
     required this.institutions,
-    required this.onChanged,
     this.validator,
   });
 
-  final String? value;
+  final TextEditingController controller;
   final List<String> institutions;
-  final ValueChanged<String?> onChanged;
   final FormFieldValidator<String>? validator;
 
   @override
+  State<_InstitutionAutocomplete> createState() =>
+      _InstitutionAutocompleteState();
+}
+
+class _InstitutionAutocompleteState extends State<_InstitutionAutocomplete> {
+  final _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      initialValue: value,
-      items: institutions.map((institution) {
-        return DropdownMenuItem(value: institution, child: Text(institution));
-      }).toList(),
-      onChanged: onChanged,
-      validator: validator,
-      autovalidateMode: AutovalidateMode.onUserInteraction,
-      icon: const Icon(
-        Icons.keyboard_arrow_down_rounded,
-        color: Color(0xFF7C7C7C),
-      ),
-      style: GoogleFonts.poppins(
-        color: const Color(0xFF222222),
-        fontSize: 13,
-        letterSpacing: 0,
-      ),
-      decoration: InputDecoration(
-        hintText: 'Choose Your Institution',
-        hintStyle: GoogleFonts.poppins(
-          color: const Color(0xFF8F8F8F),
-          fontSize: 13,
-          fontWeight: FontWeight.w400,
-          letterSpacing: 0,
-        ),
-        filled: true,
-        fillColor: const Color(0xFFF6F6F6),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 22,
-          vertical: 16,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
-        ),
-        errorStyle: GoogleFonts.poppins(
-          color: Colors.red.shade700,
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-          letterSpacing: 0,
-        ),
-      ),
+    return RawAutocomplete<String>(
+      textEditingController: widget.controller,
+      focusNode: _focusNode,
+      optionsBuilder: (textEditingValue) {
+        final query = textEditingValue.text.trim().toLowerCase();
+        if (query.isEmpty) return widget.institutions.take(8);
+        return widget.institutions
+            .where((institution) => institution.toLowerCase().contains(query))
+            .take(10);
+      },
+      fieldViewBuilder: (
+        context,
+        fieldController,
+        focusNode,
+        onFieldSubmitted,
+      ) {
+        return TextFormField(
+          controller: fieldController,
+          focusNode: focusNode,
+          textInputAction: TextInputAction.next,
+          validator: widget.validator,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          style: GoogleFonts.poppins(
+            color: const Color(0xFF222222),
+            fontSize: 13,
+            letterSpacing: 0,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Search or type your institution',
+            hintStyle: GoogleFonts.poppins(
+              color: const Color(0xFF8F8F8F),
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
+              letterSpacing: 0,
+            ),
+            suffixIcon: const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Color(0xFF7C7C7C),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF6F6F6),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 22,
+              vertical: 16,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: BorderSide.none,
+            ),
+            errorStyle: GoogleFonts.poppins(
+              color: Colors.red.shade700,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0,
+            ),
+          ),
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        final values = options.toList(growable: false);
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.87,
+              constraints: const BoxConstraints(maxHeight: 260),
+              margin: const EdgeInsets.only(top: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1F000000),
+                    blurRadius: 22,
+                    offset: Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shrinkWrap: true,
+                itemCount: values.length,
+                separatorBuilder: (_, _) => const Divider(
+                  height: 1,
+                  indent: 16,
+                  endIndent: 16,
+                  color: Color(0xFFEFEFEF),
+                ),
+                itemBuilder: (context, index) {
+                  final institution = values[index];
+                  return ListTile(
+                    dense: true,
+                    title: Text(
+                      institution,
+                      style: GoogleFonts.poppins(
+                        color: const Color(0xFF222222),
+                        fontSize: 13,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    onTap: () => onSelected(institution),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+      onSelected: (value) => widget.controller.text = value,
     );
   }
 }
