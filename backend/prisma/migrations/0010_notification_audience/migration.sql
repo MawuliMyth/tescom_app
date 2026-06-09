@@ -1,0 +1,1 @@
+ALTER TABLE "Notification" ADD COLUMN "audience" TEXT NOT NULL DEFAULT 'ALL';

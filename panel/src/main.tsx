@@ -352,6 +352,7 @@ const resources: Resource[] = [
     fields: [
       { key: "title", label: "Title" },
       { key: "body", label: "Body", type: "textarea" },
+      { key: "audience", label: "Audience", type: "select", options: ["ALL", "MEMBERS", "EXECUTIVES", "ADMINS", "SUPER_ADMINS"] },
       { key: "userId", label: "User ID optional" }
     ]
   },
@@ -1905,6 +1906,7 @@ function normalizePayload(form: Record<string, unknown>, fields: Field[]) {
 
 function defaultFormFor(resource: Resource) {
   if (resource.key === "polls") return { status: "PUBLISHED", options: "Yes\nNo" };
+  if (resource.key === "notifications") return { audience: "ALL" };
   return resource.key === "events" ? { status: "PUBLISHED" } : {};
 }
 

@@ -86,6 +86,7 @@ const asyncHandler =
 const publishStatusSchema = z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]);
 const userRoleSchema = z.enum(["USER", "ADMIN", "SUPER_ADMIN"]);
 const userStatusSchema = z.enum(["PENDING", "ACTIVE", "SUSPENDED"]);
+const notificationAudienceSchema = z.enum(["ALL", "MEMBERS", "EXECUTIVES", "ADMINS", "SUPER_ADMINS"]);
 const optionalDateSchema = z.preprocess(
   (value) => (value === "" || value === null ? undefined : value),
   z.coerce.date().optional()
@@ -340,12 +341,14 @@ const adminSchemas = {
     create: z.object({
       title: z.string().min(2),
       body: z.string().min(2),
+      audience: notificationAudienceSchema.default("ALL"),
       userId: z.string().optional(),
       readAt: optionalDateSchema
     }),
     update: z.object({
       title: z.string().min(2).optional(),
       body: z.string().min(2).optional(),
+      audience: notificationAudienceSchema.optional(),
       userId: z.string().optional(),
       readAt: optionalDateSchema
     })
@@ -657,9 +660,20 @@ app.patch("/api/app/profile", requireAuth, asyncHandler(async (req, res) => {
 }));
 
 app.get("/api/app/notifications", requireAuth, asyncHandler(async (req, res) => {
-  const notifications = await prisma.notification.findMany({
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { role: true, organizationRole: true }
+  });
+  const audiences = notificationAudiencesForUser(user);
+  const notifications = await (prisma.notification as any).findMany({
     where: {
-      OR: [{ userId: null }, { userId: req.user!.id }]
+      OR: [
+        { userId: req.user!.id },
+        {
+          userId: null,
+          audience: { in: audiences }
+        }
+      ]
     },
     orderBy: { createdAt: "desc" },
     take: 100
@@ -1104,6 +1118,7 @@ type NotificationPayload = {
   id: string;
   title: string;
   body: string;
+  audience?: string;
   userId?: string | null;
 };
 
@@ -1112,6 +1127,7 @@ type PushPayload = {
   body: string;
   data: Record<string, string>;
   userId?: string | null;
+  audience?: string | null;
 };
 
 async function sendPushForNotification(notification: NotificationPayload) {
@@ -1119,6 +1135,7 @@ async function sendPushForNotification(notification: NotificationPayload) {
     title: notification.title,
     body: notification.body,
     userId: notification.userId,
+    audience: notification.audience,
     data: {
       type: "notification",
       notificationId: notification.id
@@ -1156,13 +1173,41 @@ function resourceLabel(resourceName: string) {
   } as Record<string, string>)[resourceName] ?? "update";
 }
 
+function notificationAudiencesForUser(user?: { role: string; organizationRole: string | null } | null) {
+  const audiences = ["ALL"];
+  if (!user) return audiences;
+  if (user.role === "SUPER_ADMIN") audiences.push("SUPER_ADMINS", "ADMINS");
+  if (user.role === "ADMIN") audiences.push("ADMINS");
+  if (user.role === "USER" && user.organizationRole) audiences.push("EXECUTIVES");
+  if (user.role === "USER" && !user.organizationRole) audiences.push("MEMBERS");
+  return audiences;
+}
+
+function notificationAudienceUserWhere(audience?: string | null) {
+  if (!audience || audience === "ALL") return {};
+  if (audience === "MEMBERS") {
+    return { user: { role: "USER", organizationRole: null } };
+  }
+  if (audience === "EXECUTIVES") {
+    return { user: { role: "USER", organizationRole: { not: null } } };
+  }
+  if (audience === "ADMINS") {
+    return { user: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } };
+  }
+  if (audience === "SUPER_ADMINS") {
+    return { user: { role: "SUPER_ADMIN" } };
+  }
+  return {};
+}
+
 async function sendPush(payload: PushPayload) {
   if (!firebaseReady) return;
 
   const tokens = await db.deviceToken.findMany({
     where: {
       enabled: true,
-      ...(payload.userId ? { userId: payload.userId } : {})
+      ...(payload.userId ? { userId: payload.userId } : {}),
+      ...notificationAudienceUserWhere(payload.audience)
     },
     select: { id: true, token: true }
   });
