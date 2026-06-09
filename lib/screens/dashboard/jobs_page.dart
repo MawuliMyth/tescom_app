@@ -417,6 +417,8 @@ class _JobDetailPageState extends State<_JobDetailPage> {
     final result = await showModalBottomSheet<_JobApplicationDraft>(
       context: context,
       isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _JobApplicationSheet(job: widget.job),
     );
@@ -626,6 +628,7 @@ class _JobApplicationSheetState extends State<_JobApplicationSheet> {
   final credentialsController = TextEditingController();
   final supportingController = TextEditingController();
   late Future<AppUser?> userFuture;
+  String? prefillError;
 
   @override
   void initState() {
@@ -639,7 +642,14 @@ class _JobApplicationSheetState extends State<_JobApplicationSheet> {
           phoneController.text = user.phone ?? '';
           institutionController.text = user.institution ?? '';
         })
-        .catchError((_) {});
+        .catchError((error) {
+          if (!mounted) return null;
+          setState(() {
+            prefillError =
+                'Could not prefill your profile. You can still apply manually.';
+          });
+          return null;
+        });
   }
 
   @override
@@ -706,14 +716,27 @@ class _JobApplicationSheetState extends State<_JobApplicationSheet> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Text(
-                      'Apply for ${widget.job.title}',
-                      style: GoogleFonts.inter(
-                        color: Colors.black,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Apply for ${widget.job.title}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              color: Colors.black,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Close application form',
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -725,6 +748,10 @@ class _JobApplicationSheetState extends State<_JobApplicationSheet> {
                         letterSpacing: 0,
                       ),
                     ),
+                    if (prefillError != null) ...[
+                      const SizedBox(height: 12),
+                      _ApplicationNotice(message: prefillError!),
+                    ],
                     const SizedBox(height: 18),
                     _ApplicationField(
                       controller: fullNameController,
@@ -824,6 +851,48 @@ class _ApplicationField extends StatelessWidget {
             borderSide: const BorderSide(color: Color(0xFF34368C)),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ApplicationNotice extends StatelessWidget {
+  const _ApplicationNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            color: Color(0xFFA16207),
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.inter(
+                color: const Color(0xFFA16207),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

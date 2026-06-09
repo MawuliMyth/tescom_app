@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'api_client.dart';
@@ -31,7 +32,9 @@ class AuthService {
         return false;
       }
       return true;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('Session refresh check failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
       return true;
     }
   }
@@ -111,7 +114,10 @@ class AuthService {
       try {
         await FirebaseAuth.instance.signOut();
         await GoogleSignIn.instance.signOut();
-      } catch (_) {}
+      } catch (error, stackTrace) {
+        debugPrint('Provider sign-out failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
       await _tokenStorage.clear();
     }
   }

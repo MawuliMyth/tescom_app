@@ -39,7 +39,9 @@ class PushNotificationService {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       _firebaseInitialized = true;
       return true;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('Firebase initialization failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
       return false;
     }
   }
@@ -91,7 +93,9 @@ class PushNotificationService {
         '/api/app/device-tokens/disable',
         body: {'token': token},
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('Device token disable failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
       // The local setting still disables notification registration.
     }
   }
@@ -106,7 +110,9 @@ class PushNotificationService {
           'enabled': true,
         },
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('Device token registration failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
       // Registration is retried on next launch or token refresh.
     }
   }

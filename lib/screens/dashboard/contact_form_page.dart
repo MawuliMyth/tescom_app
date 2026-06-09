@@ -52,9 +52,14 @@ class _ContactFormPageState extends State<_ContactFormPage> {
       );
       if (!mounted) return;
       setState(() => sent = true);
-    } catch (_) {
+    } catch (exception) {
       if (!mounted) return;
-      setState(() => error = 'We could not send your message. Try again.');
+      final message = exception.toString().replaceFirst('Exception: ', '');
+      setState(
+        () => error = message.isEmpty
+            ? 'We could not send your message. Try again.'
+            : message,
+      );
     } finally {
       if (mounted) setState(() => submitting = false);
     }

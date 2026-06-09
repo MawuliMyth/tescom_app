@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:local_auth/local_auth.dart';
 
 import 'app_settings_service.dart';
@@ -17,7 +18,9 @@ class BiometricAuthService {
       final canCheck = await _localAuthentication.canCheckBiometrics;
       final supported = await _localAuthentication.isDeviceSupported();
       return canCheck && supported;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('Biometric availability check failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
       return false;
     }
   }
@@ -38,7 +41,9 @@ class BiometricAuthService {
         biometricOnly: true,
         persistAcrossBackgrounding: true,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('Biometric authentication failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
       return false;
     }
   }

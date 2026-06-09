@@ -154,8 +154,17 @@ type AdminRecord = Record<string, unknown> & {
   logoUrl?: string;
   avatarUrl?: string;
   organizationRole?: string;
+  options?: PollOptionRecord[];
   createdAt?: string;
   updatedAt?: string;
+};
+
+type PollOptionRecord = {
+  id?: string;
+  text?: string;
+  _count?: {
+    votes?: number;
+  };
 };
 
 type DashboardSummary = Partial<Record<ResourceKey, AdminRecord[]>>;
@@ -1135,6 +1144,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
               <tr>
                 <th>{primaryColumnLabel(resource)}</th>
                 {resource.key === "executives" && <th>Position</th>}
+                {resource.key === "polls" && <th>Feedback</th>}
                 <th>Status</th>
                 <th>Updated</th>
                 <th></th>
@@ -1155,6 +1165,9 @@ function ResourceManager({ resource }: { resource: Resource }) {
                   {resource.key === "executives" && (
                     <td>{row.organizationRole ? <StatusPill value={row.organizationRole} /> : "No position"}</td>
                   )}
+                  {resource.key === "polls" && (
+                    <td>{pollFeedback(row)}</td>
+                  )}
                   <td><StatusPill value={row.status ?? (row.resolved ? "Resolved" : "Open")} /></td>
                   <td>{formatDate(row.updatedAt ?? row.createdAt)}</td>
                   <td className="row-actions">
@@ -1165,7 +1178,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
               ))}
               {!filteredRows.length && (
                 <tr>
-                  <td colSpan={resource.key === "executives" ? 5 : 4} className="empty">
+                  <td colSpan={resource.key === "executives" || resource.key === "polls" ? 5 : 4} className="empty">
                     <EmptyState
                       title={query ? "No matching records" : "No records yet"}
                       message={query ? "Try a different search term or clear the search box." : `Use ${resourceActionLabel(resource).toLowerCase()} when you are ready to create live data.`}
@@ -1274,6 +1287,33 @@ function recordSubtitle(row: AdminRecord) {
   if (row.job?.title) return `${row.job.title}${row.institution ? ` - ${row.institution}` : ""}`;
   if (row.organizationRole && row.email) return `${row.organizationRole} - ${row.email}`;
   return row.summary ?? row.description ?? row.email ?? row.company ?? row.institution ?? row.organizationRole ?? row.body ?? "";
+}
+
+function pollFeedback(row: AdminRecord) {
+  const options = Array.isArray(row.options) ? row.options : [];
+  const totalVotes = options.reduce((total, option) => total + (option._count?.votes ?? 0), 0);
+  if (!options.length) {
+    return <span className="muted-cell">No options added</span>;
+  }
+
+  return (
+    <div className="poll-feedback">
+      <strong>{totalVotes} response{totalVotes === 1 ? "" : "s"}</strong>
+      {options.map((option, index) => {
+        const votes = option._count?.votes ?? 0;
+        const percent = totalVotes ? Math.round((votes / totalVotes) * 100) : 0;
+        return (
+          <div className="poll-feedback-row" key={option.id ?? `${option.text}-${index}`}>
+            <span>{option.text ?? "Untitled option"}</span>
+            <div className="poll-feedback-meter" aria-label={`${percent}%`}>
+              <i style={{ width: `${percent}%` }} />
+            </div>
+            <em>{votes} / {percent}%</em>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function filterValueFor(row: AdminRecord, key: string) {
