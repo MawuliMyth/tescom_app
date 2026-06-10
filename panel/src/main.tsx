@@ -155,8 +155,34 @@ type AdminRecord = Record<string, unknown> & {
   avatarUrl?: string;
   organizationRole?: string;
   options?: PollOptionRecord[];
+  messages?: ChatMessageRecord[];
+  participants?: ChatParticipantRecord[];
   createdAt?: string;
   updatedAt?: string;
+};
+
+type PublicUserRecord = {
+  id?: string;
+  fullName?: string;
+  email?: string;
+  avatarUrl?: string;
+  role?: string;
+  organizationRole?: string;
+};
+
+type ChatMessageRecord = {
+  id: string;
+  body?: string;
+  mediaUrl?: string;
+  mediaType?: string;
+  createdAt?: string;
+  author?: PublicUserRecord;
+};
+
+type ChatParticipantRecord = {
+  id?: string;
+  role?: string;
+  user?: PublicUserRecord;
 };
 
 type PollOptionRecord = {
@@ -958,6 +984,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
   const [chapterOptions, setChapterOptions] = useState<SelectOption[]>([]);
   const [editing, setEditing] = useState<AdminRecord | null>(null);
   const [statsPoll, setStatsPoll] = useState<AdminRecord | null>(null);
+  const [activeChat, setActiveChat] = useState<AdminRecord | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [form, setForm] = useState<Record<string, unknown>>(() => defaultFormFor(resource));
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -985,6 +1012,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
   useEffect(() => {
     setEditing(null);
     setStatsPoll(null);
+    setActiveChat(null);
     setEditorOpen(false);
     setFilters({});
     setForm(defaultFormFor(resource));
@@ -1173,6 +1201,9 @@ function ResourceManager({ resource }: { resource: Resource }) {
                   <td><StatusPill value={row.status ?? (row.resolved ? "Resolved" : "Open")} /></td>
                   <td>{formatDate(row.updatedAt ?? row.createdAt)}</td>
                   <td className="row-actions">
+                    {resource.key === "conversations" && (
+                      <IconButton icon={MessageSquare} label="Open chat room" tone="success" onClick={() => setActiveChat(row)} />
+                    )}
                     <IconButton icon={Pencil} label="Edit record" onClick={() => startEdit(row)} />
                     <IconButton icon={Trash2} label="Delete record" tone="danger" onClick={() => remove(row.id)} />
                   </td>
@@ -1239,6 +1270,9 @@ function ResourceManager({ resource }: { resource: Resource }) {
       {statsPoll && (
         <PollStatsModal poll={statsPoll} onClose={() => setStatsPoll(null)} />
       )}
+      {activeChat && (
+        <ChatRoomModal conversation={activeChat} onClose={() => setActiveChat(null)} />
+      )}
       </section>
     </PullToRefresh>
   );
@@ -1295,16 +1329,8 @@ function recordSubtitle(row: AdminRecord) {
 }
 
 function pollFeedback(row: AdminRecord, onOpen: () => void) {
-  const options = Array.isArray(row.options) ? row.options : [];
-  const totalVotes = options.reduce((total, option) => total + (option._count?.votes ?? 0), 0);
-  if (!options.length) {
-    return <span className="muted-cell">No options added</span>;
-  }
-
   return (
     <div className="poll-feedback-compact">
-      <strong>{totalVotes}</strong>
-      <span>response{totalVotes === 1 ? "" : "s"}</span>
       <ActionButton icon={BarChart3} variant="ghost" className="stats-button" onClick={onOpen}>
         View stats
       </ActionButton>
@@ -1363,6 +1389,182 @@ function PollStatsModal({ poll, onClose }: { poll: AdminRecord; onClose: () => v
 }
 
 const pollStatColors = ["#34368c", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#0ea5e9"];
+
+function ChatRoomModal({ conversation, onClose }: { conversation: AdminRecord; onClose: () => void }) {
+  const [messages, setMessages] = useState<ChatMessageRecord[]>(() => conversation.messages ?? []);
+  const [draft, setDraft] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    void loadMessages();
+  }, [conversation.id]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages.length]);
+
+  async function loadMessages() {
+    setLoading(true);
+    setNotice(null);
+    try {
+      const response = await apiFetch(`/api/app/conversations/${conversation.id}/messages`);
+      const data = await response.json() as { messages?: ChatMessageRecord[]; message?: string };
+      if (!response.ok) throw new Error(data.message ?? "Failed to load messages");
+      setMessages(data.messages ?? []);
+    } catch (error) {
+      setNotice({ type: "error", message: error instanceof Error ? error.message : "Failed to load messages" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function sendMessage(payload: { body?: string; mediaUrl?: string; mediaType?: string }) {
+    setSending(true);
+    setNotice(null);
+    try {
+      const response = await apiFetch(`/api/app/conversations/${conversation.id}/messages`, {
+        method: "POST",
+        body: JSON.stringify({
+          body: payload.body ?? "",
+          mediaUrl: payload.mediaUrl,
+          mediaType: payload.mediaType
+        })
+      });
+      const data = await response.json() as { message?: ChatMessageRecord | string };
+      if (!response.ok) throw new Error(typeof data.message === "string" ? data.message : "Failed to send message");
+      if (typeof data.message !== "string" && data.message) {
+        setMessages((current) => [...current, data.message as ChatMessageRecord]);
+      }
+      setDraft("");
+    } catch (error) {
+      setNotice({ type: "error", message: error instanceof Error ? error.message : "Failed to send message" });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function sendImage(file?: File) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setNotice({ type: "error", message: "Please choose an image file." });
+      return;
+    }
+    setSending(true);
+    setNotice(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const uploadResponse = await apiFetch("/api/admin/uploads", { method: "POST", body });
+      const uploadData = await uploadResponse.json() as { url?: string; message?: string };
+      if (!uploadResponse.ok || !uploadData.url) throw new Error(uploadData.message ?? "Image upload failed");
+      await sendMessage({ mediaUrl: uploadData.url, mediaType: file.type });
+    } catch (error) {
+      setNotice({ type: "error", message: error instanceof Error ? error.message : "Image upload failed" });
+      setSending(false);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  const participantCount = conversation.participants?.length ?? 0;
+
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <section className="chat-modal">
+        <div className="chat-modal-header">
+          <div>
+            <span>{participantCount} participant{participantCount === 1 ? "" : "s"}</span>
+            <h2>{recordTitle(conversation)}</h2>
+          </div>
+          <div className="chat-header-actions">
+            <ActionButton variant="ghost" onClick={loadMessages}>Refresh</ActionButton>
+            <IconButton icon={X} label="Close chat room" onClick={onClose} />
+          </div>
+        </div>
+        <NoticeMessage notice={notice} />
+        <div className="chat-thread admin-chat-thread">
+          {loading ? (
+            <ChatSkeleton />
+          ) : messages.length ? (
+            messages.map((message) => <ChatBubble key={message.id} message={message} />)
+          ) : (
+            <EmptyState
+              title="No messages yet"
+              message="Send the first message to start this chat room."
+            />
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+        <form
+          className="chat-composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const body = draft.trim();
+            if (!body || sending) return;
+            void sendMessage({ body });
+          }}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(event) => void sendImage(event.target.files?.[0])}
+          />
+          <IconButton
+            icon={ImageIcon}
+            label="Send image"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending}
+          />
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Message this chat room"
+            disabled={sending}
+          />
+          <button className="primary" disabled={sending || !draft.trim()}>
+            <Send size={16} />
+            Send
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function ChatBubble({ message }: { message: ChatMessageRecord }) {
+  const authorName = message.author?.fullName ?? message.author?.email ?? "Unknown user";
+  const fromAdmin = ["ADMIN", "SUPER_ADMIN"].includes(String(message.author?.role ?? "").toUpperCase());
+  return (
+    <article className={`chat-bubble ${fromAdmin ? "from-admin" : ""}`}>
+      <div className="chat-bubble-meta">
+        <strong>{authorName}</strong>
+        <span>{formatDate(message.createdAt)}</span>
+      </div>
+      {message.body && <p>{message.body}</p>}
+      {message.mediaUrl && (
+        <a href={resolveAssetUrl(message.mediaUrl)} target="_blank" rel="noreferrer" className="chat-media">
+          <img src={resolveAssetUrl(message.mediaUrl)} alt="Chat attachment" />
+        </a>
+      )}
+    </article>
+  );
+}
+
+function ChatSkeleton() {
+  return (
+    <div className="chat-skeleton">
+      <SkeletonBlock />
+      <SkeletonBlock />
+      <SkeletonBlock />
+    </div>
+  );
+}
 
 function filterValueFor(row: AdminRecord, key: string) {
   if (key === "campus") return String(row.institution ?? row.name ?? row.job?.institution ?? "");
