@@ -1672,8 +1672,9 @@ td span {
 .chat-modal {
   display: grid;
   grid-template-rows: auto auto minmax(240px, 1fr) auto;
-  width: min(920px, 100%);
-  height: min(86vh, 820px);
+  width: min(1040px, 100%);
+  height: calc(100dvh - 32px);
+  min-height: 620px;
   overflow: hidden;
   border: 1px solid rgba(219, 226, 234, 0.95);
   border-radius: 22px;
@@ -1683,12 +1684,21 @@ td span {
 }
 
 .chat-modal-header {
+  grid-row: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   border-bottom: 1px solid #e2e8f0;
   padding: 20px 22px;
+}
+
+.chat-modal > .notice {
+  grid-row: 2;
+  margin: 0;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
 }
 
 .chat-modal-header h2 {
@@ -1713,6 +1723,8 @@ td span {
 }
 
 .admin-chat-thread {
+  grid-row: 3;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1787,6 +1799,7 @@ td span {
 }
 
 .chat-composer {
+  grid-row: 4;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -1794,6 +1807,86 @@ td span {
   border-top: 1px solid #e2e8f0;
   padding: 14px;
   background: #ffffff;
+}
+
+.activity-log-modal {
+  width: min(820px, 100%);
+  max-height: min(86vh, 820px);
+  overflow: auto;
+  border: 1px solid rgba(219, 226, 234, 0.95);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 26px 70px rgba(15, 23, 42, 0.22);
+  padding: 28px;
+  animation: modal-rise 0.18s ease-out;
+}
+
+.activity-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.activity-detail-grid > div,
+.activity-metadata {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 14px;
+}
+
+.activity-detail-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.activity-detail-grid span,
+.activity-metadata span {
+  display: block;
+  margin-bottom: 5px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.activity-detail-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #111827;
+  font-size: 13px;
+}
+
+.activity-metadata {
+  margin-top: 12px;
+}
+
+.activity-metadata pre {
+  overflow: auto;
+  max-height: 260px;
+  margin: 0;
+  border-radius: 10px;
+  background: #111827;
+  color: #f8fafc;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.log-actor {
+  display: grid;
+  gap: 2px;
+}
+
+.log-actor strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.log-actor span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .chat-composer input:not([type="file"]) {
@@ -1842,7 +1935,8 @@ td span {
 
 @media (max-width: 720px) {
   .chat-modal {
-    height: min(92vh, 820px);
+    height: calc(100dvh - 18px);
+    min-height: 560px;
     border-radius: 18px;
   }
 
@@ -1877,6 +1971,10 @@ td span {
   .chat-composer .primary span,
   .chat-composer .primary::after {
     display: none;
+  }
+
+  .activity-detail-grid {
+    grid-template-columns: 1fr;
   }
 }
 

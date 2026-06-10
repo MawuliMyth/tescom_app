@@ -68,6 +68,7 @@ model User {
   deviceTokens    DeviceToken[]
   savedItems     SavedItem[]
   refreshTokens  RefreshToken[]
+  activityLogs   ActivityLog[]
   createdNews    NewsArticle[]  @relation("NewsCreator")
   createdEvents  Event[]        @relation("EventCreator")
   createdAnnouncements Announcement[] @relation("AnnouncementCreator")
@@ -329,4 +330,25 @@ model ContactMessage {
   message   String
   resolved  Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id            String   @id @default(cuid())
+  actorId       String?
+  actor         User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName     String?
+  actorEmail    String?
+  action        String
+  resource      String
+  resourceId    String?
+  resourceTitle String?
+  metadata      Json?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
 }

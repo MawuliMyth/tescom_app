@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
+  Activity,
   AlertCircle,
   Bell,
   BarChart3,
@@ -109,7 +110,8 @@ type ResourceKey =
   | "polls"
   | "conversations"
   | "notifications"
-  | "contacts";
+  | "contacts"
+  | "activityLogs";
 
 type ActiveKey = "dashboard" | ResourceKey;
 
@@ -122,6 +124,7 @@ type Resource = {
   endpoint: string;
   icon: React.ReactNode;
   fields: Field[];
+  readOnly?: boolean;
 };
 
 type Field = {
@@ -157,6 +160,15 @@ type AdminRecord = Record<string, unknown> & {
   options?: PollOptionRecord[];
   messages?: ChatMessageRecord[];
   participants?: ChatParticipantRecord[];
+  actorName?: string;
+  actorEmail?: string;
+  action?: string;
+  resource?: string;
+  resourceId?: string;
+  resourceTitle?: string;
+  metadata?: Record<string, unknown>;
+  ipAddress?: string;
+  userAgent?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -403,6 +415,14 @@ const resources: Resource[] = [
       { key: "message", label: "Message", type: "textarea" },
       { key: "resolved", label: "Resolved", type: "checkbox" }
     ]
+  },
+  {
+    key: "activityLogs",
+    label: "Activity Logs",
+    endpoint: "activityLogs",
+    icon: <Activity size={18} />,
+    fields: [],
+    readOnly: true
   }
 ];
 
@@ -985,6 +1005,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
   const [editing, setEditing] = useState<AdminRecord | null>(null);
   const [statsPoll, setStatsPoll] = useState<AdminRecord | null>(null);
   const [activeChat, setActiveChat] = useState<AdminRecord | null>(null);
+  const [activeLog, setActiveLog] = useState<AdminRecord | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [form, setForm] = useState<Record<string, unknown>>(() => defaultFormFor(resource));
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -995,7 +1016,25 @@ function ResourceManager({ resource }: { resource: Resource }) {
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return rows.filter((row) => {
-      const matchesSearch = !needle || [row.title, row.fullName, row.name, row.question, row.email, row.topic, row.summary, row.description, row.company, row.institution, row.organizationRole]
+      const matchesSearch = !needle || [
+        row.title,
+        row.fullName,
+        row.name,
+        row.question,
+        row.email,
+        row.topic,
+        row.summary,
+        row.description,
+        row.company,
+        row.institution,
+        row.organizationRole,
+        row.action,
+        row.resource,
+        row.resourceTitle,
+        row.actorName,
+        row.actorEmail,
+        row.ipAddress
+      ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(needle));
       if (!matchesSearch) return false;
@@ -1013,6 +1052,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
     setEditing(null);
     setStatsPoll(null);
     setActiveChat(null);
+    setActiveLog(null);
     setEditorOpen(false);
     setFilters({});
     setForm(defaultFormFor(resource));
@@ -1032,7 +1072,8 @@ function ResourceManager({ resource }: { resource: Resource }) {
   }, [chapterOptions, resource.fields]);
 
   async function request(path = "", init?: RequestInit) {
-    const response = await apiFetch(`/api/admin/${resource.endpoint}${path}`, {
+    const listPath = !path && resource.key === "activityLogs" ? "?pageSize=100" : path;
+    const response = await apiFetch(`/api/admin/${resource.endpoint}${listPath}`, {
       ...init,
     });
     if (response.status === 204) return null;
@@ -1129,16 +1170,18 @@ function ResourceManager({ resource }: { resource: Resource }) {
           <div className="table-tools">
             <label className="search-box">
               <Search size={16} />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search records" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={resource.key === "activityLogs" ? "Search logs" : "Search records"} />
               {query && (
                 <button type="button" className="search-clear" aria-label="Clear record search" onClick={() => setQuery("")}>
                   <X size={14} />
                 </button>
               )}
             </label>
-            <ActionButton icon={Plus} variant="primary" onClick={startCreate}>
-              {resourceActionLabel(resource)}
-            </ActionButton>
+            {!resource.readOnly && (
+              <ActionButton icon={Plus} variant="primary" onClick={startCreate}>
+                {resourceActionLabel(resource)}
+              </ActionButton>
+            )}
           </div>
         </div>
         {activeFilters.length > 0 && (
@@ -1175,9 +1218,20 @@ function ResourceManager({ resource }: { resource: Resource }) {
                 <th>{primaryColumnLabel(resource)}</th>
                 {resource.key === "executives" && <th>Position</th>}
                 {resource.key === "polls" && <th>Feedback</th>}
-                <th>Status</th>
-                <th>Updated</th>
-                <th></th>
+                {resource.key === "activityLogs" ? (
+                  <>
+                    <th>Resource</th>
+                    <th>Actor</th>
+                    <th>When</th>
+                    <th></th>
+                  </>
+                ) : (
+                  <>
+                    <th>Status</th>
+                    <th>Updated</th>
+                    <th></th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -1198,24 +1252,42 @@ function ResourceManager({ resource }: { resource: Resource }) {
                   {resource.key === "polls" && (
                     <td>{pollFeedback(row, () => setStatsPoll(row))}</td>
                   )}
-                  <td><StatusPill value={row.status ?? (row.resolved ? "Resolved" : "Open")} /></td>
-                  <td>{formatDate(row.updatedAt ?? row.createdAt)}</td>
-                  <td className="row-actions">
-                    {resource.key === "conversations" && (
-                      <IconButton icon={MessageSquare} label="Open chat room" tone="success" onClick={() => setActiveChat(row)} />
-                    )}
-                    <IconButton icon={Pencil} label="Edit record" onClick={() => startEdit(row)} />
-                    <IconButton icon={Trash2} label="Delete record" tone="danger" onClick={() => remove(row.id)} />
-                  </td>
+                  {resource.key === "activityLogs" ? (
+                    <>
+                      <td><StatusPill value={row.resource ?? "system"} /></td>
+                      <td>
+                        <div className="log-actor">
+                          <strong>{row.actorName ?? "System"}</strong>
+                          <span>{row.actorEmail ?? "No email"}</span>
+                        </div>
+                      </td>
+                      <td>{formatDate(row.createdAt)}</td>
+                      <td className="row-actions">
+                        <IconButton icon={FileText} label="View log details" onClick={() => setActiveLog(row)} />
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td><StatusPill value={row.status ?? (row.resolved ? "Resolved" : "Open")} /></td>
+                      <td>{formatDate(row.updatedAt ?? row.createdAt)}</td>
+                      <td className="row-actions">
+                        {resource.key === "conversations" && (
+                          <IconButton icon={MessageSquare} label="Open chat room" tone="success" onClick={() => setActiveChat(row)} />
+                        )}
+                        <IconButton icon={Pencil} label="Edit record" onClick={() => startEdit(row)} />
+                        <IconButton icon={Trash2} label="Delete record" tone="danger" onClick={() => remove(row.id)} />
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
               {!filteredRows.length && (
                 <tr>
-                  <td colSpan={resource.key === "executives" || resource.key === "polls" ? 5 : 4} className="empty">
+                  <td colSpan={resource.key === "executives" || resource.key === "polls" || resource.key === "activityLogs" ? 5 : 4} className="empty">
                     <EmptyState
-                      title={query ? "No matching records" : "No records yet"}
-                      message={query ? "Try a different search term or clear the search box." : `Use ${resourceActionLabel(resource).toLowerCase()} when you are ready to create live data.`}
-                      action={!query ? <ActionButton icon={Plus} variant="primary" onClick={startCreate}>{resourceActionLabel(resource)}</ActionButton> : null}
+                      title={query ? "No matching records" : resource.key === "activityLogs" ? "No activity logged yet" : "No records yet"}
+                      message={query ? "Try a different search term or clear the search box." : resource.key === "activityLogs" ? "Admin actions will appear here as the team manages content." : `Use ${resourceActionLabel(resource).toLowerCase()} when you are ready to create live data.`}
+                      action={!query && !resource.readOnly ? <ActionButton icon={Plus} variant="primary" onClick={startCreate}>{resourceActionLabel(resource)}</ActionButton> : null}
                     />
                   </td>
                 </tr>
@@ -1273,6 +1345,9 @@ function ResourceManager({ resource }: { resource: Resource }) {
       {activeChat && (
         <ChatRoomModal conversation={activeChat} onClose={() => setActiveChat(null)} />
       )}
+      {activeLog && (
+        <ActivityLogModal log={activeLog} onClose={() => setActiveLog(null)} />
+      )}
       </section>
     </PullToRefresh>
   );
@@ -1295,7 +1370,8 @@ function primaryColumnLabel(resource: Resource) {
     polls: "Poll question",
     conversations: "Chat room",
     notifications: "Notification",
-    contacts: "Contact"
+    contacts: "Contact",
+    activityLogs: "Activity"
   };
   return labels[resource.key] ?? "Record";
 }
@@ -1313,16 +1389,21 @@ function resourceActionLabel(resource: Resource) {
     polls: "Create Poll",
     conversations: "Create Chat",
     notifications: "Create Notification",
-    contacts: "Add Contact"
+    contacts: "Add Contact",
+    activityLogs: "Activity Log"
   };
   return labels[resource.key] ?? `Create ${resource.label}`;
 }
 
 function recordTitle(row: AdminRecord) {
+  if (row.action && row.resource) return `${row.action} ${row.resource}`;
   return row.title ?? row.fullName ?? row.name ?? row.question ?? row.email ?? row.topic ?? "Untitled record";
 }
 
 function recordSubtitle(row: AdminRecord) {
+  if (row.action && row.resource) {
+    return row.resourceTitle ?? row.resourceId ?? `${row.actorName ?? "System"} - ${row.actorEmail ?? "No email"}`;
+  }
   if (row.job?.title) return `${row.job.title}${row.institution ? ` - ${row.institution}` : ""}`;
   if (row.organizationRole && row.email) return `${row.organizationRole} - ${row.email}`;
   return row.summary ?? row.description ?? row.email ?? row.company ?? row.institution ?? row.organizationRole ?? row.body ?? "";
@@ -1566,12 +1647,53 @@ function ChatSkeleton() {
   );
 }
 
+function ActivityLogModal({ log, onClose }: { log: AdminRecord; onClose: () => void }) {
+  const metadata = log.metadata ? JSON.stringify(log.metadata, null, 2) : "No additional metadata";
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <section className="activity-log-modal">
+        <div className="panel-title">
+          <div>
+            <span>{formatDate(log.createdAt)}</span>
+            <h2>{recordTitle(log)}</h2>
+          </div>
+          <IconButton icon={X} label="Close activity log" onClick={onClose} />
+        </div>
+        <div className="activity-detail-grid">
+          <LogDetail label="Actor" value={log.actorName ?? "System"} />
+          <LogDetail label="Email" value={log.actorEmail ?? "No email"} />
+          <LogDetail label="Module" value={log.resource ?? "system"} />
+          <LogDetail label="Record" value={log.resourceTitle ?? log.resourceId ?? "No record"} />
+          <LogDetail label="IP address" value={log.ipAddress ?? "Unknown"} />
+          <LogDetail label="User agent" value={log.userAgent ?? "Unknown"} wide />
+        </div>
+        <div className="activity-metadata">
+          <span>Metadata</span>
+          <pre>{metadata}</pre>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function LogDetail({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={wide ? "wide" : ""}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
 function filterValueFor(row: AdminRecord, key: string) {
   if (key === "campus") return String(row.institution ?? row.name ?? row.job?.institution ?? "");
   if (key === "position") return String(row.organizationRole ?? "");
   if (key === "status") return String(row.status ?? (row.resolved ? "Resolved" : "Open"));
   if (key === "type") return String(row.type ?? "");
   if (key === "company") return String(row.company ?? row.job?.company ?? "");
+  if (key === "action") return String(row.action ?? "");
+  if (key === "resource") return String(row.resource ?? "");
+  if (key === "actor") return String(row.actorEmail ?? row.actorName ?? "");
   return String(row[key] ?? "");
 }
 
@@ -1587,7 +1709,8 @@ function buildFilters(resource: Resource, rows: AdminRecord[]) {
     jobApplications: [{ key: "status", label: "Stage" }, { key: "campus", label: "Campus / school" }],
     polls: [{ key: "status", label: "Status" }, { key: "visibility", label: "Visibility" }],
     conversations: [{ key: "isGroup", label: "Type" }],
-    contacts: [{ key: "status", label: "Status" }]
+    contacts: [{ key: "status", label: "Status" }],
+    activityLogs: [{ key: "action", label: "Action" }, { key: "resource", label: "Module" }, { key: "actor", label: "Actor" }]
   };
 
   return (keysByResource[resource.key] ?? [])

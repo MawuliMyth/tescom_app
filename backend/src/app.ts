@@ -1026,7 +1026,12 @@ const resources = {
   polls: { delegate: prisma.poll, include: { options: { include: { _count: { select: { votes: true } } } } } },
   conversations: { delegate: prisma.conversation, include: publicConversationInclude },
   notifications: { delegate: prisma.notification },
-  contacts: { delegate: prisma.contactMessage }
+  contacts: { delegate: prisma.contactMessage },
+  activityLogs: {
+    delegate: db.activityLog,
+    include: { actor: { select: publicUserSelect } },
+    readOnly: true
+  }
 } as const;
 
 const ownedResourceNames = new Set(["news", "events", "announcements", "jobs", "polls", "conversations"]);
@@ -1112,6 +1117,67 @@ async function ownedCreateData(req: express.Request, resourceName: string, data:
   const user = await getDashboardUser(req);
   if (isFullAdmin(user) && data.creatorId) return data;
   return { ...data, creatorId: req.user!.id };
+}
+
+type ActivityAction = "CREATE" | "UPDATE" | "DELETE" | "MESSAGE" | "UPLOAD";
+
+function resourceTitleFromRow(row?: Record<string, unknown> | null) {
+  if (!row) return undefined;
+  return String(
+    row.title ??
+      row.fullName ??
+      row.name ??
+      row.question ??
+      row.email ??
+      row.topic ??
+      row.company ??
+      row.id ??
+      ""
+  ) || undefined;
+}
+
+function requestIp(req: express.Request) {
+  const forwardedFor = req.header("x-forwarded-for");
+  return forwardedFor?.split(",")[0]?.trim() || req.ip;
+}
+
+function changedFields(data: Record<string, unknown>) {
+  return Object.keys(data).filter((key) => !["password", "passwordHash"].includes(key));
+}
+
+async function writeActivityLog(
+  req: express.Request,
+  details: {
+    action: ActivityAction;
+    resource: string;
+    resourceId?: string | null;
+    resourceTitle?: string | null;
+    metadata?: Record<string, unknown>;
+  }
+) {
+  try {
+    const actor = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { id: true, fullName: true, email: true }
+    });
+
+    await db.activityLog.create({
+      data: {
+        actorId: actor?.id ?? req.user!.id,
+        actorName: actor?.fullName ?? null,
+        actorEmail: actor?.email ?? req.user!.email,
+        action: details.action,
+        resource: details.resource,
+        resourceId: details.resourceId ?? undefined,
+        resourceTitle: details.resourceTitle ?? undefined,
+        metadata: details.metadata ?? undefined,
+        ipAddress: requestIp(req),
+        userAgent: req.header("user-agent") ?? undefined
+      }
+    });
+  } catch (error) {
+    console.warn("Activity log write failed", error);
+  }
 }
 
 type NotificationPayload = {
@@ -1291,6 +1357,13 @@ app.post("/api/admin/executives", requireAuth, requireAdmin, asyncHandler(async 
   const data = { ...parsed, passwordHash };
   delete (data as any).password;
   const row = await prisma.user.create({ data: data as any, select: publicUserSelect });
+  await writeActivityLog(req, {
+    action: "CREATE",
+    resource: "executives",
+    resourceId: row.id,
+    resourceTitle: row.fullName,
+    metadata: { fields: changedFields(data) }
+  });
   res.status(201).json({ row });
 }));
 
@@ -1310,11 +1383,28 @@ app.patch("/api/admin/executives/:id", requireAuth, requireAdmin, asyncHandler(a
     data: data as any,
     select: publicUserSelect
   });
+  await writeActivityLog(req, {
+    action: "UPDATE",
+    resource: "executives",
+    resourceId: row.id,
+    resourceTitle: row.fullName,
+    metadata: { fields: changedFields(data) }
+  });
   res.json({ row });
 }));
 
 app.delete("/api/admin/executives/:id", requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const existing = await prisma.user.findUnique({
+    where: { id: String(req.params.id) },
+    select: publicUserSelect
+  });
   await prisma.user.delete({ where: { id: String(req.params.id) } });
+  await writeActivityLog(req, {
+    action: "DELETE",
+    resource: "executives",
+    resourceId: String(req.params.id),
+    resourceTitle: existing?.fullName
+  });
   res.status(204).send();
 }));
 
@@ -1359,6 +1449,9 @@ for (const [name, config] of Object.entries(resources)) {
   }));
 
   router.post("/", asyncHandler(async (req, res) => {
+    if ((config as any).readOnly) {
+      return res.status(405).json({ message: "This resource is read-only" });
+    }
     if (!(await canCreateResource(req, name))) {
       return res.status(403).json({ message: "You do not have permission to create this record" });
     }
@@ -1391,10 +1484,20 @@ for (const [name, config] of Object.entries(resources)) {
     } else {
       await sendContentUpdatePush(name, row);
     }
+    await writeActivityLog(req, {
+      action: "CREATE",
+      resource: name,
+      resourceId: row.id,
+      resourceTitle: resourceTitleFromRow(row),
+      metadata: { fields: changedFields(rawData) }
+    });
     res.status(201).json({ row });
   }));
 
   router.patch("/:id", asyncHandler(async (req, res) => {
+    if ((config as any).readOnly) {
+      return res.status(405).json({ message: "This resource is read-only" });
+    }
     if (!(await ensureCanMutate(req, name, String(req.params.id), config.delegate))) {
       return res.status(403).json({ message: "You do not have permission to edit this record" });
     }
@@ -1431,14 +1534,34 @@ for (const [name, config] of Object.entries(resources)) {
       ...(config as any).include ? { include: (config as any).include } : {},
       ...(config as any).select ? { select: (config as any).select } : {}
     });
+    await writeActivityLog(req, {
+      action: "UPDATE",
+      resource: name,
+      resourceId: row.id,
+      resourceTitle: resourceTitleFromRow(row),
+      metadata: { fields: changedFields(data) }
+    });
     res.json({ row });
   }));
 
   router.delete("/:id", asyncHandler(async (req, res) => {
+    if ((config as any).readOnly) {
+      return res.status(405).json({ message: "This resource is read-only" });
+    }
     if (!(await ensureCanMutate(req, name, String(req.params.id), config.delegate))) {
       return res.status(403).json({ message: "You do not have permission to delete this record" });
     }
+    const existing = await (config.delegate as any).findUnique({
+      where: { id: String(req.params.id) },
+      ...(config as any).select ? { select: (config as any).select } : {}
+    });
     await (config.delegate as any).delete({ where: { id: String(req.params.id) } });
+    await writeActivityLog(req, {
+      action: "DELETE",
+      resource: name,
+      resourceId: String(req.params.id),
+      resourceTitle: resourceTitleFromRow(existing)
+    });
     res.status(204).send();
   }));
 
@@ -1477,6 +1600,10 @@ app.post("/api/admin/conversations/:id/messages", requireAuth, requireDashboardA
   if (!canMessage) {
     return res.status(403).json({ message: "You do not have permission to message this chat room" });
   }
+  const conversation = await db.conversation.findUnique({
+    where: { id },
+    select: { title: true }
+  });
 
   const message = await db.message.create({
     data: {
@@ -1492,6 +1619,17 @@ app.post("/api/admin/conversations/:id/messages", requireAuth, requireDashboardA
     where: { id },
     data: { updatedAt: new Date() }
   });
+  await writeActivityLog(req, {
+    action: "MESSAGE",
+    resource: "conversations",
+    resourceId: id,
+    resourceTitle: conversation?.title,
+    metadata: {
+      hasText: Boolean(body.body.trim()),
+      hasMedia: Boolean(body.mediaUrl),
+      mediaType: body.mediaType
+    }
+  });
   res.status(201).json({ message });
 }));
 
@@ -1502,6 +1640,13 @@ app.post("/api/admin/polls/:pollId/options", requireAuth, requireDashboardAccess
   if (!canEdit) return res.status(403).json({ message: "You do not have permission to update this poll" });
   const option = await prisma.pollOption.create({
     data: { pollId, text: body.text }
+  });
+  await writeActivityLog(req, {
+    action: "UPDATE",
+    resource: "polls",
+    resourceId: pollId,
+    resourceTitle: "Poll option added",
+    metadata: { fields: ["options"] }
   });
   res.status(201).json({ option });
 }));
@@ -1524,6 +1669,14 @@ app.post(
         contentType: req.file.mimetype
       });
 
+      await writeActivityLog(req, {
+        action: "UPLOAD",
+        resource: "uploads",
+        resourceId: filename,
+        resourceTitle: req.file.originalname,
+        metadata: { contentType: req.file.mimetype, size: req.file.size, storage: "blob" }
+      });
+
       return res.status(201).json({
         url: blob.url,
         filename,
@@ -1531,6 +1684,14 @@ app.post(
         size: req.file.size
       });
     }
+
+    await writeActivityLog(req, {
+      action: "UPLOAD",
+      resource: "uploads",
+      resourceId: req.file.filename,
+      resourceTitle: req.file.originalname,
+      metadata: { contentType: req.file.mimetype, size: req.file.size, storage: "local" }
+    });
 
     return res.status(201).json({
       url: `/uploads/${req.file.filename}`,
