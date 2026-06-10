@@ -1445,6 +1445,56 @@ for (const [name, config] of Object.entries(resources)) {
   app.use(`/api/admin/${name}`, router);
 }
 
+app.get("/api/admin/conversations/:id/messages", requireAuth, requireDashboardAccess, asyncHandler(async (req, res) => {
+  const id = String(req.params.id);
+  const where = await dashboardResourceWhere(req, "conversations", { id });
+  const conversation = await db.conversation.findFirst({
+    where,
+    select: { id: true }
+  });
+  if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+
+  const messages = await db.message.findMany({
+    where: { conversationId: id },
+    include: publicMessageInclude,
+    orderBy: { createdAt: "asc" },
+    take: 100
+  });
+  res.json({ messages });
+}));
+
+app.post("/api/admin/conversations/:id/messages", requireAuth, requireDashboardAccess, asyncHandler(async (req, res) => {
+  const id = String(req.params.id);
+  const body = z.object({
+    body: z.string().max(1000).default(""),
+    mediaUrl: optionalImageReferenceSchema,
+    mediaType: optionalStringSchema
+  }).refine((value) => value.body.trim().length > 0 || Boolean(value.mediaUrl), {
+    message: "Message text or media is required"
+  }).parse(req.body);
+
+  const canMessage = await ensureCanMutate(req, "conversations", id, db.conversation);
+  if (!canMessage) {
+    return res.status(403).json({ message: "You do not have permission to message this chat room" });
+  }
+
+  const message = await db.message.create({
+    data: {
+      body: body.body,
+      mediaUrl: body.mediaUrl ?? undefined,
+      mediaType: body.mediaType ?? undefined,
+      conversationId: id,
+      authorId: req.user!.id
+    },
+    include: publicMessageInclude
+  });
+  await db.conversation.update({
+    where: { id },
+    data: { updatedAt: new Date() }
+  });
+  res.status(201).json({ message });
+}));
+
 app.post("/api/admin/polls/:pollId/options", requireAuth, requireDashboardAccess, asyncHandler(async (req, res) => {
   const pollId = String(req.params.pollId);
   const body = z.object({ text: z.string().min(1) }).parse(req.body);

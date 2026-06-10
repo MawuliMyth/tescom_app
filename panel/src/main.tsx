@@ -1411,7 +1411,7 @@ function ChatRoomModal({ conversation, onClose }: { conversation: AdminRecord; o
     setLoading(true);
     setNotice(null);
     try {
-      const response = await apiFetch(`/api/app/conversations/${conversation.id}/messages`);
+      const response = await apiFetch(`/api/admin/conversations/${conversation.id}/messages`);
       const data = await response.json() as { messages?: ChatMessageRecord[]; message?: string };
       if (!response.ok) throw new Error(data.message ?? "Failed to load messages");
       setMessages(data.messages ?? []);
@@ -1426,7 +1426,7 @@ function ChatRoomModal({ conversation, onClose }: { conversation: AdminRecord; o
     setSending(true);
     setNotice(null);
     try {
-      const response = await apiFetch(`/api/app/conversations/${conversation.id}/messages`, {
+      const response = await apiFetch(`/api/admin/conversations/${conversation.id}/messages`, {
         method: "POST",
         body: JSON.stringify({
           body: payload.body ?? "",
