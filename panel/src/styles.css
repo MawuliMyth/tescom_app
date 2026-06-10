@@ -1789,6 +1789,7 @@ td span {
 .chat-composer {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
   gap: 10px;
   border-top: 1px solid #e2e8f0;
   padding: 14px;
@@ -1796,14 +1797,36 @@ td span {
 }
 
 .chat-composer input:not([type="file"]) {
+  width: 100%;
+  height: 44px;
   min-width: 0;
+  border: 1px solid #cfd8e3;
   border-radius: 999px;
+  padding: 0 18px;
+  background: #ffffff;
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 44px;
 }
 
 .chat-composer .primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 112px;
+  height: 44px;
   min-height: 44px;
   border-radius: 999px;
   padding-inline: 18px;
+}
+
+.chat-composer .icon-button {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  border-radius: 12px;
 }
 
 .chat-skeleton {
@@ -1842,12 +1865,18 @@ td span {
   }
 
   .chat-composer {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .chat-composer .primary {
-    grid-column: 1 / -1;
-    justify-content: center;
+    grid-column: auto;
+    min-width: 52px;
+    padding-inline: 14px;
+  }
+
+  .chat-composer .primary span,
+  .chat-composer .primary::after {
+    display: none;
   }
 }
 
