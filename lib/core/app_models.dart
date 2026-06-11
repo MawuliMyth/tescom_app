@@ -467,7 +467,7 @@ List<T> _list<T>(Object? value, T Function(Map<String, dynamic>) fromJson) {
 
 DateTime? _date(Object? value) {
   if (value is! String) return null;
-  return DateTime.tryParse(value);
+  return DateTime.tryParse(value)?.toLocal();
 }
 
 List<String> _stringList(Object? value) {

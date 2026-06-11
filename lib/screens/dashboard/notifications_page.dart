@@ -43,15 +43,25 @@ class _NotificationsPageState extends State<_NotificationsPage> {
         foregroundColor: Colors.black,
         leading: Padding(
           padding: const EdgeInsets.only(left: 14),
-          child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
-        ),
-        title: Text(
-          'Notifications',
-          style: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => Navigator.pop(context),
           ),
+        ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset('assets/images/logo.png', height: 30),
+            const SizedBox(width: 8),
+            Text(
+              'Notifications',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
         ),
       ),
       body: _AppScaffoldBackground(
