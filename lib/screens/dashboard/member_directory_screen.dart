@@ -51,15 +51,14 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
                   final members = (snapshot.data?.users ?? const [])
                       .map(_Member.fromUser)
                       .toList();
-                  final schools = [
-                    'All',
-                    ...{for (final member in members) member.institution},
-                  ];
                   final preferredSchool = snapshot.data?.currentUser?.institution;
+                  final schools = _schoolFilterValues(
+                    members,
+                    preferredSchool: preferredSchool,
+                  );
                   final activeSchool = _activeSchoolFor(
                     selectedSchool: selectedSchool,
                     preferredSchool: preferredSchool,
-                    schools: schools,
                     initialized: _schoolInitialized,
                   );
                   final filteredMembers = _filterMembers(
@@ -167,13 +166,25 @@ class _DirectoryPeopleData {
 String _activeSchoolFor({
   required String selectedSchool,
   required String? preferredSchool,
-  required List<String> schools,
   required bool initialized,
 }) {
   if (initialized || selectedSchool != 'All') return selectedSchool;
   final school = preferredSchool?.trim();
   if (school == null || school.isEmpty) return selectedSchool;
-  return schools.contains(school) ? school : selectedSchool;
+  return school;
+}
+
+List<String> _schoolFilterValues(
+  List<_Member> members, {
+  required String? preferredSchool,
+}) {
+  final schools = <String>{for (final member in members) member.institution};
+  final preferred = preferredSchool?.trim();
+  return [
+    'All',
+    if (preferred != null && preferred.isNotEmpty) preferred,
+    ...schools.where((school) => school != preferred),
+  ];
 }
 
 Map<String, List<_Member>> _groupMembersBySchool(List<_Member> members) {

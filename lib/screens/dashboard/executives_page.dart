@@ -64,15 +64,14 @@ class _ExecutivesPageState extends State<_ExecutivesPage> {
                 final executives = (snapshot.data?.users ?? const [])
                     .map(_Member.fromUser)
                     .toList();
-                final schools = [
-                  'All',
-                  ...{for (final member in executives) member.institution},
-                ];
                 final preferredSchool = snapshot.data?.currentUser?.institution;
+                final schools = _schoolFilterValues(
+                  executives,
+                  preferredSchool: preferredSchool,
+                );
                 final activeSchool = _activeSchoolFor(
                   selectedSchool: selectedSchool,
                   preferredSchool: preferredSchool,
-                  schools: schools,
                   initialized: _schoolInitialized,
                 );
                 final filteredExecutives = _filterExecutives(
