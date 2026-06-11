@@ -1072,7 +1072,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
   }, [chapterOptions, resource.fields]);
 
   async function request(path = "", init?: RequestInit) {
-    const listPath = !path && resource.key === "activityLogs" ? "?pageSize=100" : path;
+    const listPath = !path ? "?pageSize=100" : path;
     const response = await apiFetch(`/api/admin/${resource.endpoint}${listPath}`, {
       ...init,
     });
@@ -1216,6 +1216,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
             <thead>
               <tr>
                 <th>{primaryColumnLabel(resource)}</th>
+                {(resource.key === "users" || resource.key === "executives") && <th>Institution</th>}
                 {resource.key === "executives" && <th>Position</th>}
                 {resource.key === "polls" && <th>Feedback</th>}
                 {resource.key === "activityLogs" ? (
@@ -1246,6 +1247,9 @@ function ResourceManager({ resource }: { resource: Resource }) {
                       </div>
                     </div>
                   </td>
+                  {(resource.key === "users" || resource.key === "executives") && (
+                    <td>{row.institution ? <StatusPill value={row.institution} /> : <span className="muted-cell">No institution</span>}</td>
+                  )}
                   {resource.key === "executives" && (
                     <td>{row.organizationRole ? <StatusPill value={row.organizationRole} /> : "No position"}</td>
                   )}
@@ -1283,7 +1287,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
               ))}
               {!filteredRows.length && (
                 <tr>
-                  <td colSpan={resource.key === "executives" || resource.key === "polls" || resource.key === "activityLogs" ? 5 : 4} className="empty">
+                  <td colSpan={emptyColumnCount(resource)} className="empty">
                     <EmptyState
                       title={query ? "No matching records" : resource.key === "activityLogs" ? "No activity logged yet" : "No records yet"}
                       message={query ? "Try a different search term or clear the search box." : resource.key === "activityLogs" ? "Admin actions will appear here as the team manages content." : `Use ${resourceActionLabel(resource).toLowerCase()} when you are ready to create live data.`}
@@ -1374,6 +1378,14 @@ function primaryColumnLabel(resource: Resource) {
     activityLogs: "Activity"
   };
   return labels[resource.key] ?? "Record";
+}
+
+function emptyColumnCount(resource: Resource) {
+  let count = 4;
+  if (resource.key === "users" || resource.key === "executives") count += 1;
+  if (resource.key === "executives" || resource.key === "polls") count += 1;
+  if (resource.key === "activityLogs") return 5;
+  return count;
 }
 
 function resourceActionLabel(resource: Resource) {

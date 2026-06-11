@@ -9,12 +9,21 @@ class _ExecutivesPage extends StatefulWidget {
 }
 
 class _ExecutivesPageState extends State<_ExecutivesPage> {
+  late final Future<_DirectoryPeopleData> _executivesFuture;
+
   // Search text entered by the user.
   String query = '';
 
   // Active filter values for school and executive role.
   String selectedSchool = 'All';
   String selectedRole = 'All';
+  bool _schoolInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _executivesFuture = _loadPeople(AppRepository().loadExecutives());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,8 +50,8 @@ class _ExecutivesPageState extends State<_ExecutivesPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
           children: [
-            FutureBuilder<List<AppUser>>(
-              future: AppRepository().loadExecutives(),
+            FutureBuilder<_DirectoryPeopleData>(
+              future: _executivesFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Padding(
@@ -52,14 +61,24 @@ class _ExecutivesPageState extends State<_ExecutivesPage> {
                 }
                 if (snapshot.hasError) return const _InlineErrorState();
 
-                final executives = (snapshot.data ?? const [])
+                final executives = (snapshot.data?.users ?? const [])
                     .map(_Member.fromUser)
                     .toList();
-                final filteredExecutives = _filterExecutives(executives);
                 final schools = [
                   'All',
                   ...{for (final member in executives) member.institution},
                 ];
+                final preferredSchool = snapshot.data?.currentUser?.institution;
+                final activeSchool = _activeSchoolFor(
+                  selectedSchool: selectedSchool,
+                  preferredSchool: preferredSchool,
+                  schools: schools,
+                  initialized: _schoolInitialized,
+                );
+                final filteredExecutives = _filterExecutives(
+                  executives,
+                  school: activeSchool,
+                );
                 final roles = [
                   'All',
                   ...{for (final member in executives) member.role},
@@ -100,12 +119,13 @@ class _ExecutivesPageState extends State<_ExecutivesPage> {
                         ),
                         const SizedBox(width: 10),
                         _SmartMemberFilterButton(
-                          selectedSchool: selectedSchool,
+                          selectedSchool: activeSchool,
                           selectedRole: selectedRole,
                           schools: schools,
                           roles: roles,
                           onApply: (school, role) {
                             setState(() {
+                              _schoolInitialized = true;
                               selectedSchool = school;
                               selectedRole = role;
                             });
@@ -113,16 +133,23 @@ class _ExecutivesPageState extends State<_ExecutivesPage> {
                         ),
                       ],
                     ),
-                    if (selectedSchool != 'All' || selectedRole != 'All') ...[
+                    if (activeSchool != 'All' || selectedRole != 'All') ...[
                       const SizedBox(height: 10),
                       _ActiveFilterSummary(
-                        selectedSchool: selectedSchool,
+                        selectedSchool: activeSchool,
                         selectedRole: selectedRole,
                       ),
                     ],
                     const SizedBox(height: 18),
                     if (filteredExecutives.isEmpty)
                       const _EmptyMemberState()
+                    else if (activeSchool == 'All')
+                      ..._groupMembersBySchool(filteredExecutives).entries.map(
+                        (entry) => _SchoolMemberSection(
+                          school: entry.key,
+                          members: entry.value,
+                        ),
+                      )
                     else
                       ...filteredExecutives.map(
                         (member) => _MemberCard(member: member),
@@ -138,10 +165,12 @@ class _ExecutivesPageState extends State<_ExecutivesPage> {
   }
 
   // Applies search, school, and role filters to the executive list.
-  List<_Member> _filterExecutives(List<_Member> executives) {
+  List<_Member> _filterExecutives(
+    List<_Member> executives, {
+    required String school,
+  }) {
     return executives.where((member) {
-      final schoolMatch =
-          selectedSchool == 'All' || member.institution == selectedSchool;
+      final schoolMatch = school == 'All' || member.institution == school;
       final roleMatch = selectedRole == 'All' || member.role == selectedRole;
       final queryMatch = query.trim().isEmpty || member.matches(query);
       return schoolMatch && roleMatch && queryMatch;

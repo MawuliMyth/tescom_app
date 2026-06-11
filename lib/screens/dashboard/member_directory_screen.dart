@@ -9,12 +9,21 @@ class _MemberDirectoryPage extends StatefulWidget {
 }
 
 class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
+  late final Future<_DirectoryPeopleData> _membersFuture;
+
   // Search text entered by the user.
   String query = '';
 
   // Active filter values. "All" means the filter is not restricting results.
   String selectedSchool = 'All';
   String selectedRole = 'All';
+  bool _schoolInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _membersFuture = _loadPeople(AppRepository().loadMembers());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,8 +37,8 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
             children: [
               _MemberDirectoryTopBar(onBack: () => Navigator.pop(context)),
               const SizedBox(height: 12),
-              FutureBuilder<List<AppUser>>(
-                future: AppRepository().loadMembers(),
+              FutureBuilder<_DirectoryPeopleData>(
+                future: _membersFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Padding(
@@ -39,14 +48,24 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
                   }
                   if (snapshot.hasError) return const _InlineErrorState();
 
-                  final members = (snapshot.data ?? const [])
+                  final members = (snapshot.data?.users ?? const [])
                       .map(_Member.fromUser)
                       .toList();
-                  final filteredMembers = _filterMembers(members);
                   final schools = [
                     'All',
                     ...{for (final member in members) member.institution},
                   ];
+                  final preferredSchool = snapshot.data?.currentUser?.institution;
+                  final activeSchool = _activeSchoolFor(
+                    selectedSchool: selectedSchool,
+                    preferredSchool: preferredSchool,
+                    schools: schools,
+                    initialized: _schoolInitialized,
+                  );
+                  final filteredMembers = _filterMembers(
+                    members,
+                    school: activeSchool,
+                  );
                   final roles = [
                     'All',
                     ...{for (final member in members) member.role},
@@ -68,12 +87,13 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
                           ),
                           const SizedBox(width: 10),
                           _SmartMemberFilterButton(
-                            selectedSchool: selectedSchool,
+                            selectedSchool: activeSchool,
                             selectedRole: selectedRole,
                             schools: schools,
                             roles: roles,
                             onApply: (school, role) {
                               setState(() {
+                                _schoolInitialized = true;
                                 selectedSchool = school;
                                 selectedRole = role;
                               });
@@ -81,10 +101,10 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
                           ),
                         ],
                       ),
-                      if (selectedSchool != 'All' || selectedRole != 'All') ...[
+                      if (activeSchool != 'All' || selectedRole != 'All') ...[
                         const SizedBox(height: 10),
                         _ActiveFilterSummary(
-                          selectedSchool: selectedSchool,
+                          selectedSchool: activeSchool,
                           selectedRole: selectedRole,
                         ),
                       ],
@@ -93,6 +113,13 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
                       const SizedBox(height: 10),
                       if (filteredMembers.isEmpty)
                         const _EmptyMemberState()
+                      else if (activeSchool == 'All')
+                        ..._groupMembersBySchool(filteredMembers).entries.map(
+                          (entry) => _SchoolMemberSection(
+                            school: entry.key,
+                            members: entry.value,
+                          ),
+                        )
                       else
                         ...filteredMembers.map(
                           (member) => _MemberCard(member: member),
@@ -109,15 +136,55 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
   }
 
   // Applies search, school, and role filters to the member list.
-  List<_Member> _filterMembers(List<_Member> members) {
+  List<_Member> _filterMembers(List<_Member> members, {required String school}) {
     return members.where((member) {
-      final schoolMatch =
-          selectedSchool == 'All' || member.institution == selectedSchool;
+      final schoolMatch = school == 'All' || member.institution == school;
       final roleMatch = selectedRole == 'All' || member.role == selectedRole;
       final queryMatch = query.trim().isEmpty || member.matches(query);
       return schoolMatch && roleMatch && queryMatch;
     }).toList();
   }
+}
+
+Future<_DirectoryPeopleData> _loadPeople(Future<List<AppUser>> usersFuture) async {
+  final results = await Future.wait<Object?>([
+    usersFuture,
+    AppRepository().loadCurrentUser(),
+  ]);
+  return _DirectoryPeopleData(
+    users: results[0] as List<AppUser>,
+    currentUser: results[1] as AppUser?,
+  );
+}
+
+class _DirectoryPeopleData {
+  const _DirectoryPeopleData({required this.users, required this.currentUser});
+
+  final List<AppUser> users;
+  final AppUser? currentUser;
+}
+
+String _activeSchoolFor({
+  required String selectedSchool,
+  required String? preferredSchool,
+  required List<String> schools,
+  required bool initialized,
+}) {
+  if (initialized || selectedSchool != 'All') return selectedSchool;
+  final school = preferredSchool?.trim();
+  if (school == null || school.isEmpty) return selectedSchool;
+  return schools.contains(school) ? school : selectedSchool;
+}
+
+Map<String, List<_Member>> _groupMembersBySchool(List<_Member> members) {
+  final grouped = <String, List<_Member>>{};
+  for (final member in members) {
+    grouped.putIfAbsent(member.institution, () => []).add(member);
+  }
+  return Map.fromEntries(
+    grouped.entries.toList()
+      ..sort((a, b) => a.key.toLowerCase().compareTo(b.key.toLowerCase())),
+  );
 }
 
 // Header row with back button and centered page title.
@@ -536,6 +603,77 @@ class _MemberListLabel extends StatelessWidget {
         fontSize: 14,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
+      ),
+    );
+  }
+}
+
+class _SchoolMemberSection extends StatelessWidget {
+  const _SchoolMemberSection({required this.school, required this.members});
+
+  final String school;
+  final List<_Member> members;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFEFFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFDADCF8)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.school_outlined,
+                  color: Color(0xFF34368C),
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    school,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF23245F),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${members.length}',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF34368C),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...members.map((member) => _MemberCard(member: member)),
+        ],
       ),
     );
   }

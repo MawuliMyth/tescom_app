@@ -618,9 +618,14 @@ app.post("/api/app/contact", asyncHandler(async (req, res) => {
   res.status(201).json({ contactMessage });
 }));
 
-app.get("/api/app/members", requireAuth, asyncHandler(async (_req, res) => {
+app.get("/api/app/members", requireAuth, asyncHandler(async (req, res) => {
+  const institution = typeof req.query.institution === "string" ? req.query.institution.trim() : "";
   const members = await prisma.user.findMany({
-    where: { status: "ACTIVE", role: "USER" },
+    where: {
+      status: "ACTIVE",
+      role: "USER",
+      ...(institution ? { institution } : {})
+    },
     select: publicUserSelect,
     orderBy: { fullName: "asc" },
     take: 200
@@ -628,12 +633,14 @@ app.get("/api/app/members", requireAuth, asyncHandler(async (_req, res) => {
   res.json({ members });
 }));
 
-app.get("/api/app/executives", requireAuth, asyncHandler(async (_req, res) => {
+app.get("/api/app/executives", requireAuth, asyncHandler(async (req, res) => {
+  const institution = typeof req.query.institution === "string" ? req.query.institution.trim() : "";
   const executives = await prisma.user.findMany({
     where: {
       status: "ACTIVE",
       role: "USER",
-      organizationRole: { not: null }
+      organizationRole: { not: null },
+      ...(institution ? { institution } : {})
     },
     select: publicUserSelect,
     orderBy: { fullName: "asc" },
