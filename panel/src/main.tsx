@@ -246,6 +246,77 @@ const organizationRoleOptions = [
   "TESCON Member"
 ];
 
+const institutionOptions = [
+  "UG",
+  "University of Ghana",
+  "KNUST",
+  "Kwame Nkrumah University of Science and Technology",
+  "UCC",
+  "University of Cape Coast",
+  "UEW",
+  "University of Education, Winneba",
+  "UDS",
+  "University for Development Studies",
+  "UHAS",
+  "University of Health and Allied Sciences",
+  "UENR",
+  "University of Energy and Natural Resources",
+  "UMaT",
+  "University of Mines and Technology",
+  "SD Dombo University of Business and Integrated Development Studies",
+  "C. K. Tedam University of Technology and Applied Sciences",
+  "Akenten Appiah-Menka University of Skills Training and Entrepreneurial Development",
+  "UPSA",
+  "GIMPA",
+  "Ghana Communication Technology University",
+  "Ghana Institute of Journalism",
+  "Ghana Institute of Languages",
+  "Accra Technical University",
+  "Kumasi Technical University",
+  "Takoradi Technical University",
+  "Koforidua Technical University",
+  "Ho Technical University",
+  "Cape Coast Technical University",
+  "Tamale Technical University",
+  "Sunyani Technical University",
+  "Bolgatanga Technical University",
+  "Wa Technical University",
+  "Akatsi Technical Institute",
+  "Ashesi University",
+  "Central University",
+  "Valley View University",
+  "Pentecost University",
+  "Methodist University Ghana",
+  "Presbyterian University Ghana",
+  "Catholic University of Ghana",
+  "Regent University College of Science and Technology",
+  "Wisconsin International University College",
+  "Lancaster University Ghana",
+  "Academic City University College",
+  "Ghana Christian University College",
+  "African University College of Communications",
+  "BlueCrest University College",
+  "Knutsford University College",
+  "Garden City University College",
+  "Radford University College",
+  "Zenith University College",
+  "Islamic University College Ghana",
+  "All Nations University",
+  "Data Link Institute",
+  "University College of Management Studies",
+  "Perez University College",
+  "Webster University Ghana",
+  "KAAF University College",
+  "Mountcrest University College",
+  "Spiritan University College",
+  "Ensign Global College",
+  "Ghana Baptist University College",
+  "Maranatha University College",
+  "Nightingale School of Nursing",
+  "Korle Bu Nursing and Midwifery Training College",
+  "37 Military Hospital Nursing and Midwifery Training College"
+];
+
 const resources: Resource[] = [
   {
     key: "users",
@@ -256,7 +327,7 @@ const resources: Resource[] = [
       { key: "fullName", label: "Full name" },
       { key: "email", label: "Email" },
       { key: "phone", label: "Phone" },
-      { key: "institution", label: "Institution" },
+      { key: "institution", label: "Institution", type: "select", options: institutionOptions },
       { key: "avatarUrl", label: "Profile photo", type: "image" },
       { key: "organizationRole", label: "Organization role", type: "select", options: organizationRoleOptions },
       { key: "chapterId", label: "Campus chapter", type: "select", options: [] },
@@ -272,7 +343,7 @@ const resources: Resource[] = [
       { key: "fullName", label: "Full name" },
       { key: "email", label: "Email" },
       { key: "phone", label: "Phone" },
-      { key: "institution", label: "Institution" },
+      { key: "institution", label: "Institution", type: "select", options: institutionOptions },
       { key: "avatarUrl", label: "Profile photo", type: "image" },
       { key: "organizationRole", label: "Executive role", type: "select", options: organizationRoleOptions },
       { key: "chapterId", label: "Campus chapter", type: "select", options: [] },
@@ -1072,7 +1143,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
   }, [chapterOptions, resource.fields]);
 
   async function request(path = "", init?: RequestInit) {
-    const listPath = !path ? "?pageSize=100" : path;
+    const listPath = !path ? "?pageSize=1000" : path;
     const response = await apiFetch(`/api/admin/${resource.endpoint}${listPath}`, {
       ...init,
     });
@@ -1728,9 +1799,17 @@ function buildFilters(resource: Resource, rows: AdminRecord[]) {
   return (keysByResource[resource.key] ?? [])
     .map((filter) => ({
       ...filter,
-      options: Array.from(new Set(rows.map((row) => filterValueFor(row, filter.key)).filter(Boolean))).sort()
+      options: filterOptionsFor(filter.key, rows)
     }))
     .filter((filter) => filter.options.length > 0);
+}
+
+function filterOptionsFor(key: string, rows: AdminRecord[]) {
+  const liveOptions = rows.map((row) => filterValueFor(row, key)).filter(Boolean);
+  const baseOptions = key === "campus" ? institutionOptions : [];
+  return Array.from(new Set([...baseOptions, ...liveOptions])).sort((a, b) =>
+    a.localeCompare(b)
+  );
 }
 
 function StatusPill({ value }: { value: unknown }) {

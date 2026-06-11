@@ -107,7 +107,7 @@ const optionalImageReferencesSchema = z.array(imageReferenceSchema).max(10).opti
 
 const adminListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25)
+  pageSize: z.coerce.number().int().min(1).max(1000).default(25)
 });
 const jobApplicationStatusSchema = z.enum([
   "APPLIED",
