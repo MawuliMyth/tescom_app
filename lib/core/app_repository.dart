@@ -1,15 +1,25 @@
 import 'dart:typed_data';
+import 'dart:convert';
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'api_client.dart';
 import 'app_models.dart';
 
 class AppRepository {
-  AppRepository({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
+  AppRepository({ApiClient? apiClient, FlutterSecureStorage? storage})
+    : _apiClient = apiClient ?? ApiClient(),
+      _storage = storage ?? const FlutterSecureStorage();
 
   final ApiClient _apiClient;
+  final FlutterSecureStorage _storage;
 
   Future<AppBootstrap> loadBootstrap() async {
-    final data = await _apiClient.get('/api/app/bootstrap', auth: false);
+    final data = await _getCachedMap(
+      '/api/app/bootstrap',
+      cacheKey: _CacheKeys.bootstrap,
+      auth: false,
+    );
     return AppBootstrap.fromJson(data);
   }
 
@@ -27,23 +37,32 @@ class AppRepository {
   }
 
   Future<List<AppUser>> loadMembers() async {
-    final data = await _apiClient.get('/api/app/members');
+    final data = await _getCachedMap(
+      '/api/app/members',
+      cacheKey: _CacheKeys.members,
+    );
     return _list(data['members'], AppUser.fromJson);
   }
 
   Future<AppUser?> loadCurrentUser() async {
-    final data = await _apiClient.get('/api/auth/me');
+    final data = await _getCachedMap('/api/auth/me', cacheKey: _CacheKeys.me);
     if (data['user'] is! Map<String, dynamic>) return null;
     return AppUser.fromJson(data['user'] as Map<String, dynamic>);
   }
 
   Future<List<AppUser>> loadExecutives() async {
-    final data = await _apiClient.get('/api/app/executives');
+    final data = await _getCachedMap(
+      '/api/app/executives',
+      cacheKey: _CacheKeys.executives,
+    );
     return _list(data['executives'], AppUser.fromJson);
   }
 
   Future<List<AppNotification>> loadNotifications() async {
-    final data = await _apiClient.get('/api/app/notifications');
+    final data = await _getCachedMap(
+      '/api/app/notifications',
+      cacheKey: _CacheKeys.notifications,
+    );
     return _list(data['notifications'], AppNotification.fromJson);
   }
 
@@ -73,7 +92,10 @@ class AppRepository {
   }
 
   Future<List<AppConversation>> loadConversations() async {
-    final data = await _apiClient.get('/api/app/conversations');
+    final data = await _getCachedMap(
+      '/api/app/conversations',
+      cacheKey: _CacheKeys.conversations,
+    );
     return _list(data['conversations'], AppConversation.fromJson);
   }
 
@@ -93,8 +115,9 @@ class AppRepository {
   Future<List<AppMessage>> loadConversationMessages(
     String conversationId,
   ) async {
-    final data = await _apiClient.get(
+    final data = await _getCachedMap(
       '/api/app/conversations/$conversationId/messages',
+      cacheKey: _CacheKeys.messages(conversationId),
     );
     return _list(data['messages'], AppMessage.fromJson);
   }
@@ -198,6 +221,46 @@ class AppRepository {
       body: {'optionId': optionId},
     );
   }
+
+  Future<Map<String, dynamic>> _getCachedMap(
+    String path, {
+    required String cacheKey,
+    bool auth = true,
+  }) async {
+    try {
+      final data = await _apiClient.get(path, auth: auth);
+      await _storage.write(key: cacheKey, value: jsonEncode(data));
+      return data;
+    } on ApiException {
+      final cached = await _readCachedMap(cacheKey);
+      if (cached != null) return cached;
+      rethrow;
+    } catch (_) {
+      final cached = await _readCachedMap(cacheKey);
+      if (cached != null) return cached;
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _readCachedMap(String cacheKey) async {
+    final cached = await _storage.read(key: cacheKey);
+    if (cached == null || cached.isEmpty) return null;
+    final decoded = jsonDecode(cached);
+    if (decoded is Map<String, dynamic>) return decoded;
+    return null;
+  }
+}
+
+class _CacheKeys {
+  static const bootstrap = 'cache_app_bootstrap';
+  static const me = 'cache_auth_me';
+  static const members = 'cache_app_members';
+  static const executives = 'cache_app_executives';
+  static const notifications = 'cache_app_notifications';
+  static const conversations = 'cache_app_conversations';
+
+  static String messages(String conversationId) =>
+      'cache_app_conversation_messages_$conversationId';
 }
 
 bool _hasValue(String? value) => value != null && value.trim().isNotEmpty;

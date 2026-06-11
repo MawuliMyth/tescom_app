@@ -303,7 +303,7 @@ String? _validateRequiredPassword(String? value) {
   return null;
 }
 
-class _AuthInput extends StatelessWidget {
+class _AuthInput extends StatefulWidget {
   const _AuthInput({
     required this.controller,
     required this.hintText,
@@ -325,14 +325,27 @@ class _AuthInput extends StatelessWidget {
   final ValueChanged<String>? onFieldSubmitted;
 
   @override
+  State<_AuthInput> createState() => _AuthInputState();
+}
+
+class _AuthInputState extends State<_AuthInput> {
+  late bool _obscured;
+
+  @override
+  void initState() {
+    super.initState();
+    _obscured = widget.obscureText;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      textInputAction: textInputAction,
-      validator: validator,
-      onFieldSubmitted: onFieldSubmitted,
+      controller: widget.controller,
+      keyboardType: widget.keyboardType,
+      obscureText: _obscured,
+      textInputAction: widget.textInputAction,
+      validator: widget.validator,
+      onFieldSubmitted: widget.onFieldSubmitted,
       autovalidateMode: AutovalidateMode.onUserInteraction,
       style: GoogleFonts.poppins(
         color: const Color(0xFF222222),
@@ -340,14 +353,27 @@ class _AuthInput extends StatelessWidget {
         letterSpacing: 0,
       ),
       decoration: InputDecoration(
-        hintText: hintText,
+        hintText: widget.hintText,
         hintStyle: GoogleFonts.poppins(
           color: const Color(0xFF9A9A9A),
           fontSize: 13,
           fontWeight: FontWeight.w400,
           letterSpacing: 0,
         ),
-        prefixIcon: Icon(icon, color: const Color(0xFF7C7C7C), size: 20),
+        prefixIcon: Icon(widget.icon, color: const Color(0xFF7C7C7C), size: 20),
+        suffixIcon: widget.obscureText
+            ? IconButton(
+                tooltip: _obscured ? 'Show password' : 'Hide password',
+                onPressed: () => setState(() => _obscured = !_obscured),
+                icon: Icon(
+                  _obscured
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: const Color(0xFF7C7C7C),
+                  size: 20,
+                ),
+              )
+            : null,
         filled: true,
         fillColor: const Color(0xFFF6F6F6),
         contentPadding: const EdgeInsets.symmetric(

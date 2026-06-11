@@ -745,6 +745,7 @@ app.get("/api/app/conversations", requireAuth, asyncHandler(async (req, res) => 
   const conversations = await db.conversation.findMany({
     where: {
       OR: [
+        { isGroup: true },
         { creatorId: req.user!.id },
         { participants: { some: { userId: req.user!.id } } }
       ]
@@ -785,6 +786,7 @@ app.get("/api/app/conversations/:id/messages", requireAuth, asyncHandler(async (
     where: {
       id,
       OR: [
+        { isGroup: true },
         { creatorId: req.user!.id },
         { participants: { some: { userId: req.user!.id } } }
       ]
@@ -815,6 +817,7 @@ app.post("/api/app/conversations/:id/messages", requireAuth, asyncHandler(async 
     where: {
       id,
       OR: [
+        { isGroup: true },
         { creatorId: req.user!.id },
         { participants: { some: { userId: req.user!.id } } }
       ]
@@ -822,6 +825,12 @@ app.post("/api/app/conversations/:id/messages", requireAuth, asyncHandler(async 
     select: { id: true }
   });
   if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+
+  await db.conversationParticipant.upsert({
+    where: { conversationId_userId: { conversationId: id, userId: req.user!.id } },
+    update: {},
+    create: { conversationId: id, userId: req.user!.id }
+  });
 
   const message = await db.message.create({
     data: {

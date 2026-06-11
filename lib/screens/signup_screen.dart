@@ -330,7 +330,7 @@ String? _validateConfirmPassword(String? value, String password) {
   return null;
 }
 
-class _SignUpInput extends StatelessWidget {
+class _SignUpInput extends StatefulWidget {
   const _SignUpInput({
     required this.controller,
     required this.hintText,
@@ -352,14 +352,27 @@ class _SignUpInput extends StatelessWidget {
   final ValueChanged<String>? onFieldSubmitted;
 
   @override
+  State<_SignUpInput> createState() => _SignUpInputState();
+}
+
+class _SignUpInputState extends State<_SignUpInput> {
+  late bool _obscured;
+
+  @override
+  void initState() {
+    super.initState();
+    _obscured = widget.obscureText;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      textInputAction: textInputAction,
-      validator: validator,
-      onFieldSubmitted: onFieldSubmitted,
+      controller: widget.controller,
+      keyboardType: widget.keyboardType,
+      obscureText: _obscured,
+      textInputAction: widget.textInputAction,
+      validator: widget.validator,
+      onFieldSubmitted: widget.onFieldSubmitted,
       autovalidateMode: AutovalidateMode.onUserInteraction,
       style: GoogleFonts.poppins(
         color: const Color(0xFF222222),
@@ -367,16 +380,29 @@ class _SignUpInput extends StatelessWidget {
         letterSpacing: 0,
       ),
       decoration: InputDecoration(
-        hintText: hintText,
+        hintText: widget.hintText,
         hintStyle: GoogleFonts.poppins(
           color: const Color(0xFF8F8F8F),
           fontSize: 13,
           fontWeight: FontWeight.w400,
           letterSpacing: 0,
         ),
-        prefixIcon: icon == null
+        prefixIcon: widget.icon == null
             ? null
-            : Icon(icon, color: const Color(0xFF7C7C7C), size: 20),
+            : Icon(widget.icon, color: const Color(0xFF7C7C7C), size: 20),
+        suffixIcon: widget.obscureText
+            ? IconButton(
+                tooltip: _obscured ? 'Show password' : 'Hide password',
+                onPressed: () => setState(() => _obscured = !_obscured),
+                icon: Icon(
+                  _obscured
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: const Color(0xFF7C7C7C),
+                  size: 20,
+                ),
+              )
+            : null,
         filled: true,
         fillColor: const Color(0xFFF6F6F6),
         contentPadding: const EdgeInsets.symmetric(
@@ -502,54 +528,50 @@ class _InstitutionAutocompleteState extends State<_InstitutionAutocomplete> {
             .where((institution) => institution.toLowerCase().contains(query))
             .take(10);
       },
-      fieldViewBuilder: (
-        context,
-        fieldController,
-        focusNode,
-        onFieldSubmitted,
-      ) {
-        return TextFormField(
-          controller: fieldController,
-          focusNode: focusNode,
-          textInputAction: TextInputAction.next,
-          validator: widget.validator,
-          autovalidateMode: AutovalidateMode.onUserInteraction,
-          style: GoogleFonts.poppins(
-            color: const Color(0xFF222222),
-            fontSize: 13,
-            letterSpacing: 0,
-          ),
-          decoration: InputDecoration(
-            hintText: 'Search or type your institution',
-            hintStyle: GoogleFonts.poppins(
-              color: const Color(0xFF8F8F8F),
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
-              letterSpacing: 0,
-            ),
-            suffixIcon: const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: Color(0xFF7C7C7C),
-            ),
-            filled: true,
-            fillColor: const Color(0xFFF6F6F6),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 22,
-              vertical: 16,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide.none,
-            ),
-            errorStyle: GoogleFonts.poppins(
-              color: Colors.red.shade700,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0,
-            ),
-          ),
-        );
-      },
+      fieldViewBuilder:
+          (context, fieldController, focusNode, onFieldSubmitted) {
+            return TextFormField(
+              controller: fieldController,
+              focusNode: focusNode,
+              textInputAction: TextInputAction.next,
+              validator: widget.validator,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              style: GoogleFonts.poppins(
+                color: const Color(0xFF222222),
+                fontSize: 13,
+                letterSpacing: 0,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search or type your institution',
+                hintStyle: GoogleFonts.poppins(
+                  color: const Color(0xFF8F8F8F),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 0,
+                ),
+                suffixIcon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: Color(0xFF7C7C7C),
+                ),
+                filled: true,
+                fillColor: const Color(0xFFF6F6F6),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                  vertical: 16,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
+                ),
+                errorStyle: GoogleFonts.poppins(
+                  color: Colors.red.shade700,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0,
+                ),
+              ),
+            );
+          },
       optionsViewBuilder: (context, onSelected, options) {
         final values = options.toList(growable: false);
         return Align(
