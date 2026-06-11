@@ -166,6 +166,44 @@ class AppRepository {
     );
   }
 
+  Future<({String url, String contentType})> uploadProfileImage({
+    required String filename,
+    required List<int> bytes,
+    required String contentType,
+  }) async {
+    final data = await _apiClient.uploadFile(
+      '/api/app/uploads',
+      fieldName: 'file',
+      filename: filename,
+      bytes: Uint8List.fromList(bytes),
+      contentType: contentType,
+    );
+    return (
+      url: data['url'] as String? ?? '',
+      contentType: data['contentType'] as String? ?? contentType,
+    );
+  }
+
+  Future<AppUser> updateProfile({
+    String? fullName,
+    String? phone,
+    String? institution,
+    String? avatarUrl,
+    String? bio,
+  }) async {
+    final data = await _apiClient.patch(
+      '/api/app/profile',
+      body: {
+        if (_hasValue(fullName)) 'fullName': fullName!.trim(),
+        if (_hasValue(phone)) 'phone': phone!.trim(),
+        if (_hasValue(institution)) 'institution': institution!.trim(),
+        if (_hasValue(avatarUrl)) 'avatarUrl': avatarUrl!.trim(),
+        if (_hasValue(bio)) 'bio': bio!.trim(),
+      },
+    );
+    return AppUser.fromJson(data['user'] as Map<String, dynamic>);
+  }
+
   Future<void> applyForJob({
     required String jobId,
     String? fullName,

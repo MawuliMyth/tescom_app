@@ -345,22 +345,116 @@ String? _validateNewPassword(String? value) {
 }
 
 // Profile block shown at the top of settings.
-class _SettingsProfileHeader extends StatelessWidget {
+class _SettingsProfileHeader extends StatefulWidget {
   const _SettingsProfileHeader();
+
+  @override
+  State<_SettingsProfileHeader> createState() => _SettingsProfileHeaderState();
+}
+
+class _SettingsProfileHeaderState extends State<_SettingsProfileHeader> {
+  late Future<AppUser?> userFuture;
+  bool uploading = false;
+  final imagePicker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    userFuture = AppRepository().loadCurrentUser();
+  }
+
+  Future<void> pickProfileImage() async {
+    if (uploading) return;
+    try {
+      final picked = await imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+      );
+      if (picked == null) return;
+
+      setState(() => uploading = true);
+      final upload = await AppRepository().uploadProfileImage(
+        filename: picked.name,
+        bytes: await picked.readAsBytes(),
+        contentType: picked.mimeType ?? _imageContentType(picked.name),
+      );
+      await AppRepository().updateProfile(avatarUrl: upload.url);
+      if (!mounted) return;
+      setState(() {
+        userFuture = AppRepository().loadCurrentUser();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile photo updated')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    } finally {
+      if (mounted) setState(() => uploading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<AppUser?>(
-      future: AppRepository().loadCurrentUser(),
+      future: userFuture,
       builder: (context, snapshot) {
         final user = snapshot.data;
         return Row(
           children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundImage: user?.avatarUrl == null
-                  ? const AssetImage('assets/images/logo.png')
-                  : _memberImageProvider(user!.avatarUrl!),
+            InkWell(
+              onTap: uploading ? null : pickProfileImage,
+              borderRadius: BorderRadius.circular(32),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: const Color(0xFFEFEFFC),
+                    backgroundImage:
+                        user?.avatarUrl == null || user!.avatarUrl!.isEmpty
+                        ? null
+                        : _memberImageProvider(user.avatarUrl!),
+                    child: user?.avatarUrl == null || user!.avatarUrl!.isEmpty
+                        ? Text(
+                            _profileInitials(user?.fullName),
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF34368C),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0,
+                            ),
+                          )
+                        : null,
+                  ),
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF34368C),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: uploading
+                          ? const Icon(
+                              Icons.more_horiz_rounded,
+                              color: Colors.white,
+                              size: 14,
+                            )
+                          : const Icon(
+                              Icons.camera_alt_rounded,
+                              color: Colors.white,
+                              size: 13,
+                            ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -402,6 +496,16 @@ class _SettingsProfileHeader extends StatelessWidget {
                       ),
                     ),
                   ],
+                  const SizedBox(height: 6),
+                  Text(
+                    uploading ? 'Uploading photo...' : 'Tap photo to change',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF34368C),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -410,6 +514,24 @@ class _SettingsProfileHeader extends StatelessWidget {
       },
     );
   }
+}
+
+String _profileInitials(String? fullName) {
+  final parts = (fullName ?? 'TESCON Member')
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return 'TM';
+  return parts.take(2).map((part) => part[0].toUpperCase()).join();
+}
+
+String _imageContentType(String filename) {
+  final lower = filename.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  return 'image/jpeg';
 }
 
 // A titled group of settings rows.
