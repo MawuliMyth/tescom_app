@@ -48,31 +48,25 @@ class _NotificationsPageState extends State<_NotificationsPage> {
             onPressed: () => Navigator.pop(context),
           ),
         ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset('assets/images/logo.png', height: 30),
-            const SizedBox(width: 8),
-            Text(
-              'Notifications',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0,
-              ),
-            ),
-          ],
+        title: Text(
+          'Notifications',
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+          ),
         ),
       ),
       body: _AppScaffoldBackground(
         child: SafeArea(
           top: false,
+          bottom: false,
           child: FutureBuilder<List<AppNotification>>(
             future: notificationsFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Padding(
-                  padding: EdgeInsets.fromLTRB(18, 18, 18, 28),
+                  padding: EdgeInsets.fromLTRB(18, 18, 18, 12),
                   child: _ListShimmer(itemCount: 5),
                 );
               }
@@ -85,12 +79,12 @@ class _NotificationsPageState extends State<_NotificationsPage> {
                 child: notifications.isEmpty
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
                         children: const [_NotificationEmptyState()],
                       )
                     : ListView.separated(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
                         itemCount: notifications.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
@@ -229,14 +223,6 @@ class _NotificationDetailSheet extends StatelessWidget {
                   color: const Color(0xFFE2E8F0),
                   borderRadius: BorderRadius.circular(999),
                 ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Center(
-              child: Image.asset(
-                'assets/images/logo.png',
-                height: 58,
-                fit: BoxFit.contain,
               ),
             ),
             const SizedBox(height: 18),

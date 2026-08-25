@@ -34,30 +34,34 @@ class _DemoPageShell extends StatelessWidget {
           ),
         ),
       ),
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
-          children: [
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                color: const Color(0xFF777777),
-                fontSize: 12,
-                height: 1.35,
-                letterSpacing: 0,
+      body: _AppScaffoldBackground(
+        child: SafeArea(
+          top: false,
+          bottom: false,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
+            children: [
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF777777),
+                  fontSize: 12,
+                  height: 1.35,
+                  letterSpacing: 0,
+                ),
               ),
-            ),
-            const SizedBox(height: 18),
-            ...children,
-          ],
+              const SizedBox(height: 18),
+              ...children,
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+// ignore: unused_element
 class _SearchablePageShell extends StatelessWidget {
   const _SearchablePageShell({
     required this.title,
@@ -94,8 +98,9 @@ class _SearchablePageShell extends StatelessWidget {
       ),
       body: SafeArea(
         top: false,
+        bottom: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
           children: [
             Text(
               subtitle,

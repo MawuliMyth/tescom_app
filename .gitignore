@@ -43,3 +43,23 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/.gradle/
+
+# Local secrets and release artifacts
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.jks
+*.keystore
+*.p12
+*.pem
+*.apk
+*.aab
+*.db
+*.sqlite
+*.sqlite3
+uploads/
+**/uploads/

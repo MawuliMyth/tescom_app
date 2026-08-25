@@ -66,6 +66,15 @@ class AppRepository {
     return _list(data['notifications'], AppNotification.fromJson);
   }
 
+  Future<List<AppHistoryEntry>> loadHistory() async {
+    final data = await _getCachedMap(
+      '/api/app/history',
+      cacheKey: _CacheKeys.history,
+      auth: false,
+    );
+    return _list(data['history'], AppHistoryEntry.fromJson);
+  }
+
   Future<void> markNotificationRead(String id) async {
     await _apiClient.patch('/api/app/notifications/$id/read');
   }
@@ -89,6 +98,40 @@ class AppRepository {
       '/api/auth/change-password',
       body: {'currentPassword': currentPassword, 'newPassword': newPassword},
     );
+  }
+
+  Future<String> requestPasswordReset({required String email}) async {
+    final data = await _apiClient.post(
+      '/api/auth/request-password-reset',
+      auth: false,
+      body: {'email': email.trim()},
+    );
+    final message = data['message'];
+    return message is String && message.trim().isNotEmpty
+        ? message.trim()
+        : 'If an account exists for this email, a reset code has been sent.';
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    await _apiClient.post(
+      '/api/auth/reset-password',
+      auth: false,
+      body: {'token': token.trim(), 'newPassword': newPassword},
+    );
+  }
+
+  Future<void> clearCachedSessionData() {
+    return Future.wait([
+      _storage.delete(key: _CacheKeys.me),
+      _storage.delete(key: _CacheKeys.members),
+      _storage.delete(key: _CacheKeys.executives),
+      _storage.delete(key: _CacheKeys.notifications),
+      _storage.delete(key: _CacheKeys.history),
+      _storage.delete(key: _CacheKeys.conversations),
+    ]);
   }
 
   Future<List<AppConversation>> loadConversations() async {
@@ -201,6 +244,7 @@ class AppRepository {
         if (_hasValue(bio)) 'bio': bio!.trim(),
       },
     );
+    await _storage.write(key: _CacheKeys.me, value: jsonEncode(data));
     return AppUser.fromJson(data['user'] as Map<String, dynamic>);
   }
 
@@ -295,6 +339,7 @@ class _CacheKeys {
   static const members = 'cache_app_members';
   static const executives = 'cache_app_executives';
   static const notifications = 'cache_app_notifications';
+  static const history = 'cache_app_history';
   static const conversations = 'cache_app_conversations';
 
   static String messages(String conversationId) =>

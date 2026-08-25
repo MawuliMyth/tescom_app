@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import multer from "multer";
 import { put } from "@vercel/blob";
+import nodemailer from "nodemailer";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getMessaging } from "firebase-admin/messaging";
@@ -33,6 +34,9 @@ const uploadDir = path.resolve("storage/uploads");
 const imageMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const mediaMimeTypes = new Set([...imageMimeTypes, "video/mp4", "video/webm", "video/quicktime"]);
 const useBlobStorage = Boolean(env.BLOB_READ_WRITE_TOKEN);
+const adminRateLimitStore = new Map<string, { count: number; resetAt: number }>();
+const adminRateLimitWindowMs = 60_000;
+const adminRateLimitMax = 180;
 
 fs.mkdirSync(uploadDir, { recursive: true });
 
@@ -83,6 +87,111 @@ const asyncHandler =
     void handler(req, res, next).catch(next);
   };
 
+const adminRateLimit: express.RequestHandler = (req, res, next) => {
+  const now = Date.now();
+  const key = adminRateLimitKey(req);
+  const current = adminRateLimitStore.get(key);
+  const bucket = !current || current.resetAt <= now
+    ? { count: 0, resetAt: now + adminRateLimitWindowMs }
+    : current;
+
+  bucket.count += 1;
+  adminRateLimitStore.set(key, bucket);
+
+  const remaining = Math.max(0, adminRateLimitMax - bucket.count);
+  const retryAfter = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+  res.setHeader("X-RateLimit-Limit", String(adminRateLimitMax));
+  res.setHeader("X-RateLimit-Remaining", String(remaining));
+  res.setHeader("X-RateLimit-Reset", String(Math.ceil(bucket.resetAt / 1000)));
+
+  if (bucket.count > adminRateLimitMax) {
+    res.setHeader("Retry-After", String(retryAfter));
+    return res.status(429).json({
+      message: `Too many dashboard requests. Please wait ${retryAfter} seconds and try again.`
+    });
+  }
+
+  if (adminRateLimitStore.size > 5000) {
+    for (const [storeKey, value] of adminRateLimitStore) {
+      if (value.resetAt <= now) adminRateLimitStore.delete(storeKey);
+    }
+  }
+
+  return next();
+};
+
+function adminRateLimitKey(req: express.Request) {
+  const authHeader = req.header("authorization") ?? "";
+  const identity = authHeader || requestIp(req) || "unknown";
+  return crypto.createHash("sha256").update(identity).digest("hex");
+}
+
+function hashPasswordResetToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+async function sendPasswordResetEmail(email: string, code: string) {
+  if (!env.SMTP_ENABLED || !env.SMTP_HOST || !env.SMTP_PORT || !env.SMTP_USER || !env.SMTP_PASS || !env.SMTP_FROM) {
+    return {
+      sent: false,
+      message: "Password reset email is not configured yet. Please contact an administrator to reset your password."
+    };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      secure: env.SMTP_PORT === 465,
+      auth: {
+        user: env.SMTP_USER,
+        pass: env.SMTP_PASS
+      }
+    });
+
+    await transporter.sendMail({
+      from: env.SMTP_FROM,
+      to: email,
+      subject: "Reset your Tescon password",
+      html: passwordResetEmailHtml(code),
+      text: `Your Tescon password reset code is ${code}. This code expires in 30 minutes. If you did not request this, ignore this email.`
+    });
+  } catch (error) {
+    console.error("SMTP password reset email failed", error);
+    return {
+      sent: false,
+      message: smtpFailureMessage(error)
+    };
+  }
+
+  return { sent: true };
+}
+
+function smtpFailureMessage(error: unknown) {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  if (message.includes("authentication") || message.includes("invalid login") || message.includes("535")) {
+    return "Password reset email is not configured correctly. Please check the Brevo SMTP login and SMTP key.";
+  }
+  if (message.includes("sender") || message.includes("from")) {
+    return "Password reset sender email is not verified yet. Please verify the sender in Brevo.";
+  }
+
+  return "Password reset email could not be sent right now. Please try again shortly.";
+}
+
+function passwordResetEmailHtml(code: string) {
+  return `
+    <div style="font-family: Inter, Arial, sans-serif; background:#f8f6ff; padding:32px;">
+      <div style="max-width:520px; margin:0 auto; background:#ffffff; border-radius:20px; padding:28px; color:#222;">
+        <h1 style="margin:0 0 8px; font-size:22px;">Reset your Tescon password</h1>
+        <p style="margin:0 0 22px; color:#555; line-height:1.5;">Use this code in the Tescon app to set a new password. The code expires in 30 minutes.</p>
+        <div style="font-size:32px; letter-spacing:8px; font-weight:800; color:#34368C; background:#efeffc; border-radius:14px; padding:18px 20px; text-align:center;">${code}</div>
+        <p style="margin:22px 0 0; color:#777; font-size:13px; line-height:1.5;">If you did not request a password reset, you can safely ignore this email.</p>
+      </div>
+    </div>
+  `;
+}
+
 const publishStatusSchema = z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]);
 const userRoleSchema = z.enum(["USER", "ADMIN", "SUPER_ADMIN"]);
 const userStatusSchema = z.enum(["PENDING", "ACTIVE", "SUSPENDED"]);
@@ -101,7 +210,9 @@ const imageReferenceSchema = z
     (value) => value.startsWith("/uploads/") || z.string().url().safeParse(value).success,
     "Expected an uploaded image path or a valid URL"
   );
+const mediaReferenceSchema = imageReferenceSchema;
 const optionalImageReferenceSchema = imageReferenceSchema.nullable().optional();
+const optionalMediaReferenceSchema = mediaReferenceSchema.nullable().optional();
 const imageReferencesSchema = z.array(imageReferenceSchema).max(10).default([]);
 const optionalImageReferencesSchema = z.array(imageReferenceSchema).max(10).optional();
 
@@ -123,16 +234,25 @@ const optionalStringSchema = z.preprocess(
 );
 
 const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  fullName: z.string().min(2),
+  email: z.string().trim().email("Enter a valid email address").transform((value) => value.toLowerCase()),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  fullName: z.string().trim().min(2, "Full name must be at least 2 characters"),
   phone: z.string().optional(),
   institution: z.string().optional()
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1)
+  email: z.string().trim().email("Enter a valid email address").transform((value) => value.toLowerCase()),
+  password: z.string().min(1, "Password is required")
+});
+
+const requestPasswordResetSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address").transform((value) => value.toLowerCase())
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().trim().regex(/^\d{6}$/, "Enter the 6 digit reset code"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters")
 });
 
 const publicUserSelect = {
@@ -173,6 +293,28 @@ const publishedOrder = (limit = 20) => ({
 });
 
 const adminSchemas = {
+  adminUsers: {
+    create: z.object({
+      email: z.string().email(),
+      password: z.string().min(8),
+      fullName: z.string().min(2),
+      phone: z.string().optional(),
+      avatarUrl: optionalImageReferenceSchema,
+      bio: z.string().optional(),
+      role: z.enum(["ADMIN", "SUPER_ADMIN"]).default("ADMIN"),
+      status: userStatusSchema.default("ACTIVE")
+    }),
+    update: z.object({
+      email: z.string().email().optional(),
+      password: z.string().min(8).optional(),
+      fullName: z.string().min(2).optional(),
+      phone: z.string().optional(),
+      avatarUrl: optionalImageReferenceSchema,
+      bio: z.string().optional(),
+      role: z.enum(["ADMIN", "SUPER_ADMIN"]).optional(),
+      status: userStatusSchema.optional()
+    })
+  },
   users: {
     create: z.object({
       email: z.string().email(),
@@ -287,6 +429,30 @@ const adminSchemas = {
       priority: z.enum(["normal", "high", "urgent"]).optional(),
       status: publishStatusSchema.optional(),
       publishedAt: optionalDateSchema
+    })
+  },
+  history: {
+    create: z.object({
+      title: z.string().min(2),
+      summary: z.string().optional(),
+      body: z.string().min(2),
+      category: z.string().optional(),
+      occurredAt: optionalDateSchema,
+      imageUrl: optionalImageReferenceSchema,
+      mediaUrl: optionalMediaReferenceSchema,
+      mediaType: optionalStringSchema,
+      status: publishStatusSchema.default("PUBLISHED")
+    }),
+    update: z.object({
+      title: z.string().min(2).optional(),
+      summary: z.string().optional(),
+      body: z.string().min(2).optional(),
+      category: z.string().optional(),
+      occurredAt: optionalDateSchema,
+      imageUrl: optionalImageReferenceSchema,
+      mediaUrl: optionalMediaReferenceSchema,
+      mediaType: optionalStringSchema,
+      status: publishStatusSchema.optional()
     })
   },
   jobs: {
@@ -459,6 +625,77 @@ app.post("/api/auth/login", asyncHandler(async (req, res) => {
   return res.json({ user: safeUser, tokens });
 }));
 
+app.post("/api/auth/request-password-reset", asyncHandler(async (req, res) => {
+  const body = requestPasswordResetSchema.parse(req.body);
+  const user = await prisma.user.findUnique({ where: { email: body.email } });
+  const resetCode = crypto.randomInt(100000, 1000000).toString();
+  const emailConfigured = Boolean(
+    env.SMTP_ENABLED && env.SMTP_HOST && env.SMTP_PORT && env.SMTP_USER && env.SMTP_PASS && env.SMTP_FROM
+  );
+
+  if (user) {
+    await db.passwordResetToken.create({
+      data: {
+        tokenHash: hashPasswordResetToken(resetCode),
+        userId: user.id,
+        expiresAt: tokenExpiry(30 * 60)
+      }
+    });
+  }
+
+  if (!emailConfigured) {
+    return res.status(503).json({
+      message: "Password reset email is not configured yet. Please contact an administrator to reset your password."
+    });
+  }
+
+  if (user) {
+    const delivery = await sendPasswordResetEmail(body.email, resetCode);
+    if (!delivery.sent) {
+      return res.status(503).json({
+        message: delivery.message
+      });
+    }
+  }
+
+  return res.json({
+    message: "If an account exists for this email, a reset code has been sent."
+  });
+}));
+
+app.post("/api/auth/reset-password", asyncHandler(async (req, res) => {
+  const body = resetPasswordSchema.parse(req.body);
+  const reset = await db.passwordResetToken.findUnique({
+    where: { tokenHash: hashPasswordResetToken(body.token) },
+    include: { user: true }
+  });
+
+  if (!reset || reset.usedAt || reset.expiresAt <= new Date()) {
+    return res.status(400).json({ message: "This password reset link is invalid or has expired." });
+  }
+
+  if (reset.user.status === "SUSPENDED") {
+    return res.status(403).json({ message: "This account is suspended." });
+  }
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: reset.userId },
+      data: { passwordHash: await hashPassword(body.newPassword), status: "ACTIVE" }
+    }),
+    db.passwordResetToken.update({
+      where: { id: reset.id },
+      data: { usedAt: new Date() }
+    }),
+    prisma.refreshToken.updateMany({
+      where: { userId: reset.userId, revokedAt: null },
+      data: { revokedAt: new Date() }
+    })
+  ]);
+
+  return res.status(204).send();
+}));
+
 app.post("/api/auth/firebase", asyncHandler(async (req, res) => {
   if (!firebaseReady) {
     return res.status(503).json({ message: "Firebase authentication is not configured" });
@@ -574,10 +811,11 @@ app.post("/api/auth/change-password", requireAuth, asyncHandler(async (req, res)
 }));
 
 app.get("/api/app/bootstrap", asyncHandler(async (_req, res) => {
-  const [news, events, announcements, jobs, rawChapters, polls] = await Promise.all([
+  const [news, events, announcements, history, jobs, rawChapters, polls] = await Promise.all([
     prisma.newsArticle.findMany(publishedOrder()),
     prisma.event.findMany(publishedOrder()),
     prisma.announcement.findMany(publishedOrder()),
+    db.historyEntry.findMany(publishedOrder()),
     prisma.job.findMany(publishedOrder()),
     prisma.chapter.findMany({
       include: {
@@ -603,7 +841,16 @@ app.get("/api/app/bootstrap", asyncHandler(async (_req, res) => {
     eventsCount: _count.events
   }));
 
-  res.json({ news, events, announcements, jobs, chapters, polls });
+  res.json({ news, events, announcements, history, jobs, chapters, polls });
+}));
+
+app.get("/api/app/history", asyncHandler(async (_req, res) => {
+  const history = await db.historyEntry.findMany({
+    where: { status: "PUBLISHED" },
+    orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+    take: 100
+  });
+  res.json({ history });
 }));
 
 app.post("/api/app/contact", asyncHandler(async (req, res) => {
@@ -1022,6 +1269,18 @@ app.post("/api/app/polls/:pollId/vote", requireAuth, asyncHandler(async (req, re
 }));
 
 const resources = {
+  adminUsers: {
+    delegate: prisma.user,
+    select: publicUserSelect,
+    where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } },
+    scrubCreate: async (data: any) => ({
+      ...data,
+      organizationRole: null,
+      chapterId: null,
+      institution: null,
+      passwordHash: await hashPassword(data.password)
+    })
+  },
   users: {
     delegate: prisma.user,
     select: publicUserSelect,
@@ -1034,6 +1293,7 @@ const resources = {
   news: { delegate: prisma.newsArticle },
   events: { delegate: prisma.event },
   announcements: { delegate: prisma.announcement },
+  history: { delegate: db.historyEntry },
   jobs: { delegate: prisma.job },
   jobApplications: {
     delegate: db.jobApplication,
@@ -1050,11 +1310,12 @@ const resources = {
   }
 } as const;
 
-const ownedResourceNames = new Set(["news", "events", "announcements", "jobs", "polls", "conversations"]);
+const ownedResourceNames = new Set(["news", "events", "announcements", "history", "jobs", "polls", "conversations"]);
 const executiveWritableResourceNames = new Set([
   "news",
   "events",
   "announcements",
+  "history",
   "jobs",
   "jobApplications",
   "polls",
@@ -1065,6 +1326,8 @@ async function getDashboardUser(req: express.Request) {
   const cached = (req as any).dashboardUser;
   if (cached) return cached as {
     id: string;
+    email: string;
+    fullName: string;
     role: "USER" | "ADMIN" | "SUPER_ADMIN";
     status: "PENDING" | "ACTIVE" | "SUSPENDED";
     organizationRole: string | null;
@@ -1072,15 +1335,82 @@ async function getDashboardUser(req: express.Request) {
 
   const user = await prisma.user.findUnique({
     where: { id: req.user!.id },
-    select: { id: true, role: true, status: true, organizationRole: true }
+    select: { id: true, email: true, fullName: true, role: true, status: true, organizationRole: true }
   });
   (req as any).dashboardUser = user;
   return user;
 }
 
 const isFullAdmin = (user?: { role: string } | null) => Boolean(user && ["ADMIN", "SUPER_ADMIN"].includes(user.role));
+const isSuperAdmin = (user?: { role: string } | null) => user?.role === "SUPER_ADMIN";
 const canUseDashboard = (user?: { role: string; status: string; organizationRole: string | null } | null) =>
   Boolean(user && user.status === "ACTIVE" && (isFullAdmin(user) || user.organizationRole));
+const allDashboardResources = [
+  "adminUsers",
+  "users",
+  "executives",
+  "chapters",
+  "news",
+  "events",
+  "announcements",
+  "history",
+  "jobs",
+  "jobApplications",
+  "polls",
+  "conversations",
+  "notifications",
+  "contacts",
+  "activityLogs"
+] as const;
+type DashboardResourceName = typeof allDashboardResources[number];
+type DashboardPermission = "read" | "create" | "update" | "delete" | "message" | "upload";
+type DashboardPermissionMap = Record<DashboardResourceName, DashboardPermission[]>;
+
+function dashboardPermissionsFor(user?: { role: string; organizationRole: string | null } | null): DashboardPermissionMap {
+  const empty = emptyDashboardPermissions();
+  if (!user) return empty;
+
+  const full = ["read", "create", "update", "delete", "message", "upload"] as DashboardPermission[];
+  if (isSuperAdmin(user)) {
+    return Object.fromEntries(allDashboardResources.map((resource) => [resource, [...full]])) as DashboardPermissionMap;
+  }
+  if (user.role === "ADMIN") {
+    return {
+      ...Object.fromEntries(allDashboardResources.map((resource) => [resource, [...full]])) as DashboardPermissionMap,
+      adminUsers: []
+    };
+  }
+
+  if (!user.organizationRole) return empty;
+
+  return {
+    ...empty,
+    chapters: ["read"],
+    news: ["read", "create", "update", "delete", "upload"],
+    events: ["read", "create", "update", "delete", "upload"],
+    announcements: ["read", "create", "update", "delete"],
+    history: ["read", "create", "update", "delete", "upload"],
+    jobs: ["read", "create", "update", "delete", "upload"],
+    jobApplications: ["read", "update"],
+    polls: ["read", "create", "update", "delete"],
+    conversations: ["read", "create", "update", "delete", "message", "upload"],
+    notifications: ["read"],
+    activityLogs: ["read"],
+  };
+}
+
+function emptyDashboardPermissions(): DashboardPermissionMap {
+  return allDashboardResources.reduce((permissions, resource) => {
+    permissions[resource] = [];
+    return permissions;
+  }, {} as DashboardPermissionMap);
+}
+
+async function hasDashboardPermission(req: express.Request, resourceName: string, permission: DashboardPermission) {
+  const user = await getDashboardUser(req);
+  const permissions = dashboardPermissionsFor(user);
+  return Boolean((permissions as Record<string, DashboardPermission[]>)[resourceName]?.includes(permission));
+}
 
 const requireDashboardAccess: express.RequestHandler = (req, res, next) => {
   void getDashboardUser(req)
@@ -1107,8 +1437,15 @@ async function dashboardResourceWhere(req: express.Request, resourceName: string
   return { ...baseWhere, id: "__no_access__" };
 }
 
-async function ensureCanMutate(req: express.Request, resourceName: string, id: string, delegate: any) {
+async function ensureCanMutate(
+  req: express.Request,
+  resourceName: string,
+  id: string,
+  delegate: any,
+  permission: "update" | "delete" | "message" = "update"
+) {
   const user = await getDashboardUser(req);
+  if (!(await hasDashboardPermission(req, resourceName, permission))) return false;
   if (isFullAdmin(user)) return true;
   if (!executiveWritableResourceNames.has(resourceName)) return false;
   if (resourceName === "jobApplications") {
@@ -1124,8 +1461,7 @@ async function ensureCanMutate(req: express.Request, resourceName: string, id: s
 }
 
 async function canCreateResource(req: express.Request, resourceName: string) {
-  const user = await getDashboardUser(req);
-  return isFullAdmin(user) || executiveWritableResourceNames.has(resourceName);
+  return hasDashboardPermission(req, resourceName, "create");
 }
 
 async function ownedCreateData(req: express.Request, resourceName: string, data: Record<string, unknown>) {
@@ -1241,7 +1577,7 @@ async function sendContentUpdatePush(resourceName: string, row: Record<string, u
 }
 
 function shouldPushContentUpdate(resourceName: string, row: Record<string, unknown>) {
-  if (!["news", "events", "announcements", "jobs", "polls"].includes(resourceName)) return false;
+  if (!["news", "events", "announcements", "history", "jobs", "polls"].includes(resourceName)) return false;
   return row.status === "PUBLISHED";
 }
 
@@ -1250,6 +1586,7 @@ function resourceLabel(resourceName: string) {
     news: "news",
     events: "event",
     announcements: "announcement",
+    history: "history entry",
     jobs: "job",
     polls: "poll"
   } as Record<string, string>)[resourceName] ?? "update";
@@ -1327,7 +1664,20 @@ const executiveWhere = {
   organizationRole: { not: null }
 };
 
+app.use("/api/admin", adminRateLimit);
+
+app.get("/api/admin/me", requireAuth, requireDashboardAccess, asyncHandler(async (req, res) => {
+  const user = await getDashboardUser(req);
+  res.json({
+    user,
+    permissions: dashboardPermissionsFor(user)
+  });
+}));
+
 app.get("/api/admin/executives", requireAuth, requireDashboardAccess, asyncHandler(async (req, res) => {
+  if (!(await hasDashboardPermission(req, "executives", "read"))) {
+    return res.status(403).json({ message: "You do not have permission to view executives" });
+  }
   const { page, pageSize } = adminListQuerySchema.parse(req.query);
   const skip = (page - 1) * pageSize;
   const user = await getDashboardUser(req);
@@ -1353,6 +1703,9 @@ app.get("/api/admin/executives", requireAuth, requireDashboardAccess, asyncHandl
 }));
 
 app.get("/api/admin/executives/:id", requireAuth, requireDashboardAccess, asyncHandler(async (req, res) => {
+  if (!(await hasDashboardPermission(req, "executives", "read"))) {
+    return res.status(403).json({ message: "You do not have permission to view executives" });
+  }
   const user = await getDashboardUser(req);
   const row = await prisma.user.findFirst({
     where: { id: String(req.params.id), ...executiveWhere, ...(isFullAdmin(user) ? {} : { id: req.user!.id }) },
@@ -1429,9 +1782,12 @@ for (const [name, config] of Object.entries(resources)) {
   router.use(requireAuth, requireDashboardAccess);
 
   router.get("/", asyncHandler(async (req, res) => {
+    if (!(await hasDashboardPermission(req, name, "read"))) {
+      return res.status(403).json({ message: `You do not have permission to view ${name}` });
+    }
     const { page, pageSize } = adminListQuerySchema.parse(req.query);
     const skip = (page - 1) * pageSize;
-    const where = await dashboardResourceWhere(req, name);
+    const where = await dashboardResourceWhere(req, name, (config as any).where ?? {});
     const [rows, total] = await Promise.all([
       (config.delegate as any).findMany({
         where,
@@ -1454,7 +1810,10 @@ for (const [name, config] of Object.entries(resources)) {
   }));
 
   router.get("/:id", asyncHandler(async (req, res) => {
-    const where = await dashboardResourceWhere(req, name, { id: String(req.params.id) });
+    if (!(await hasDashboardPermission(req, name, "read"))) {
+      return res.status(403).json({ message: `You do not have permission to view ${name}` });
+    }
+    const where = await dashboardResourceWhere(req, name, { ...((config as any).where ?? {}), id: String(req.params.id) });
     const row = await (config.delegate as any).findFirst({
       where,
       ...(config as any).include ? { include: (config as any).include } : {},
@@ -1514,12 +1873,26 @@ for (const [name, config] of Object.entries(resources)) {
     if ((config as any).readOnly) {
       return res.status(405).json({ message: "This resource is read-only" });
     }
-    if (!(await ensureCanMutate(req, name, String(req.params.id), config.delegate))) {
+    if (!(await ensureCanMutate(req, name, String(req.params.id), config.delegate, "update"))) {
       return res.status(403).json({ message: "You do not have permission to edit this record" });
     }
+    if ((config as any).where) {
+      const target = await (config.delegate as any).findFirst({
+        where: { ...((config as any).where ?? {}), id: String(req.params.id) },
+        select: { id: true }
+      });
+      if (!target) return res.status(404).json({ message: "Not found" });
+    }
     const parsed = (adminSchemas as any)[name].update.parse(req.body);
+    if (
+      name === "adminUsers" &&
+      String(req.params.id) === req.user!.id &&
+      (parsed.role === "ADMIN" || parsed.status === "SUSPENDED")
+    ) {
+      return res.status(400).json({ message: "You cannot demote or suspend your own super admin account" });
+    }
     const data = { ...parsed };
-    if (name === "users" && data.password) {
+    if ((name === "users" || name === "adminUsers") && data.password) {
       data.passwordHash = await hashPassword(data.password);
       delete data.password;
     }
@@ -1564,13 +1937,17 @@ for (const [name, config] of Object.entries(resources)) {
     if ((config as any).readOnly) {
       return res.status(405).json({ message: "This resource is read-only" });
     }
-    if (!(await ensureCanMutate(req, name, String(req.params.id), config.delegate))) {
+    if (name === "adminUsers" && String(req.params.id) === req.user!.id) {
+      return res.status(400).json({ message: "You cannot delete your own admin account" });
+    }
+    if (!(await ensureCanMutate(req, name, String(req.params.id), config.delegate, "delete"))) {
       return res.status(403).json({ message: "You do not have permission to delete this record" });
     }
-    const existing = await (config.delegate as any).findUnique({
-      where: { id: String(req.params.id) },
+    const existing = await (config.delegate as any).findFirst({
+      where: { ...((config as any).where ?? {}), id: String(req.params.id) },
       ...(config as any).select ? { select: (config as any).select } : {}
     });
+    if (!existing) return res.status(404).json({ message: "Not found" });
     await (config.delegate as any).delete({ where: { id: String(req.params.id) } });
     await writeActivityLog(req, {
       action: "DELETE",
@@ -1585,6 +1962,9 @@ for (const [name, config] of Object.entries(resources)) {
 }
 
 app.get("/api/admin/conversations/:id/messages", requireAuth, requireDashboardAccess, asyncHandler(async (req, res) => {
+  if (!(await hasDashboardPermission(req, "conversations", "read"))) {
+    return res.status(403).json({ message: "You do not have permission to view chat messages" });
+  }
   const id = String(req.params.id);
   const where = await dashboardResourceWhere(req, "conversations", { id });
   const conversation = await db.conversation.findFirst({
@@ -1612,7 +1992,7 @@ app.post("/api/admin/conversations/:id/messages", requireAuth, requireDashboardA
     message: "Message text or media is required"
   }).parse(req.body);
 
-  const canMessage = await ensureCanMutate(req, "conversations", id, db.conversation);
+  const canMessage = await ensureCanMutate(req, "conversations", id, db.conversation, "message");
   if (!canMessage) {
     return res.status(403).json({ message: "You do not have permission to message this chat room" });
   }
@@ -1652,7 +2032,7 @@ app.post("/api/admin/conversations/:id/messages", requireAuth, requireDashboardA
 app.post("/api/admin/polls/:pollId/options", requireAuth, requireDashboardAccess, asyncHandler(async (req, res) => {
   const pollId = String(req.params.pollId);
   const body = z.object({ text: z.string().min(1) }).parse(req.body);
-  const canEdit = await ensureCanMutate(req, "polls", pollId, prisma.poll);
+  const canEdit = await ensureCanMutate(req, "polls", pollId, prisma.poll, "update");
   if (!canEdit) return res.status(403).json({ message: "You do not have permission to update this poll" });
   const option = await prisma.pollOption.create({
     data: { pollId, text: body.text }
@@ -1671,6 +2051,12 @@ app.post(
   "/api/admin/uploads",
   requireAuth,
   requireDashboardAccess,
+  asyncHandler(async (req, res, next) => {
+    if (!(await hasDashboardPermission(req, "news", "upload"))) {
+      return res.status(403).json({ message: "You do not have permission to upload media" });
+    }
+    return next();
+  }),
   upload.single("file"),
   asyncHandler(async (req, res) => {
     if (!req.file) {
@@ -1720,12 +2106,15 @@ app.post(
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (err instanceof z.ZodError) {
-    return res.status(400).json({ message: "Validation failed", issues: err.issues });
+    return res.status(400).json({
+      message: readableValidationMessage(err),
+      issues: err.issues
+    });
   }
 
   if (err instanceof PrismaClientKnownRequestError) {
     if (err.code === "P2002") {
-      return res.status(409).json({ message: "A record with this value already exists" });
+      return res.status(409).json({ message: duplicateRecordMessage(err) });
     }
 
     if (err.code === "P2025") {
@@ -1743,6 +2132,44 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   console.error(err);
   return res.status(500).json({ message: "Something went wrong" });
 });
+
+function readableValidationMessage(error: z.ZodError) {
+  const issue = error.issues[0];
+  if (!issue) return "Please check the information you entered and try again";
+
+  const field = readableFieldName(issue.path);
+  return field ? `${field}: ${issue.message}` : issue.message;
+}
+
+function duplicateRecordMessage(error: PrismaClientKnownRequestError) {
+  const target = Array.isArray(error.meta?.target) ? error.meta?.target : [];
+  const fields = target.map((field) => readableFieldName([field])).filter(Boolean);
+
+  if (fields.includes("Email")) {
+    return "An account with this email already exists. Please sign in instead.";
+  }
+
+  if (fields.length) {
+    return `${fields.join(", ")} already exists. Please use a different value.`;
+  }
+
+  return "A record with this information already exists. Please use different details.";
+}
+
+function readableFieldName(pathParts: (string | number)[]) {
+  const raw = String(pathParts.at(-1) ?? "");
+  if (!raw) return "";
+
+  const labels: Record<string, string> = {
+    fullName: "Full name",
+    email: "Email",
+    password: "Password",
+    phone: "Phone number",
+    institution: "Institution"
+  };
+
+  return labels[raw] ?? raw.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase());
+}
 
 function toPublicUser(user: {
   id: string;

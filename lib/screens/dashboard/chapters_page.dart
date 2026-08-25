@@ -24,67 +24,70 @@ class _ChaptersPage extends StatelessWidget {
           ),
         ),
       ),
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 26),
-          children: [
-            Text(
-              'Explore chapter executives, members, news, and events by institution.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                color: const Color(0xFF777777),
-                fontSize: 13,
-                height: 1.35,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0,
+      body: _AppScaffoldBackground(
+        child: SafeArea(
+          top: false,
+          bottom: false,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+            children: [
+              Text(
+                'Explore chapter executives, members, news, and events by institution.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF777777),
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            FutureBuilder<List<Object>>(
-              future: Future.wait<Object>([
-                AppRepository().loadBootstrap(),
-                AppRepository().loadMembers(),
-              ]),
-              builder: (context, snapshot) {
-                final bootstrap = snapshot.data == null
-                    ? null
-                    : snapshot.data![0] as AppBootstrap;
-                final members = snapshot.data == null
-                    ? const <AppUser>[]
-                    : snapshot.data![1] as List<AppUser>;
-                final apiChapters = bootstrap?.chapters
-                    .map(
-                      (chapter) =>
-                          _chapterFromApi(chapter, members, bootstrap.events),
-                    )
-                    .toList(growable: false);
-                final chapters = apiChapters ?? const [];
+              const SizedBox(height: 20),
+              FutureBuilder<List<Object>>(
+                future: Future.wait<Object>([
+                  AppRepository().loadBootstrap(),
+                  AppRepository().loadMembers(),
+                ]),
+                builder: (context, snapshot) {
+                  final bootstrap = snapshot.data == null
+                      ? null
+                      : snapshot.data![0] as AppBootstrap;
+                  final members = snapshot.data == null
+                      ? const <AppUser>[]
+                      : snapshot.data![1] as List<AppUser>;
+                  final apiChapters = bootstrap?.chapters
+                      .map(
+                        (chapter) =>
+                            _chapterFromApi(chapter, members, bootstrap.events),
+                      )
+                      .toList(growable: false);
+                  final chapters = apiChapters ?? const [];
 
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const _ListShimmer(itemCount: 4);
-                }
-                if (snapshot.hasError) return const _InlineErrorState();
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const _ListShimmer(itemCount: 4);
+                  }
+                  if (snapshot.hasError) return const _InlineErrorState();
 
-                if (chapters.isEmpty) {
-                  return const _InfoCard(
-                    item: _InfoItem(
-                      title: 'No chapters yet',
-                      subtitle: 'Admin dashboard',
-                      body: 'Created chapters will appear here.',
-                      icon: Icons.school_outlined,
-                    ),
+                  if (chapters.isEmpty) {
+                    return const _InfoCard(
+                      item: _InfoItem(
+                        title: 'No chapters yet',
+                        subtitle: 'Admin dashboard',
+                        body: 'Created chapters will appear here.',
+                        icon: Icons.school_outlined,
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: chapters
+                        .map((chapter) => _CampusChapterTile(chapter: chapter))
+                        .toList(),
                   );
-                }
-
-                return Column(
-                  children: chapters
-                      .map((chapter) => _CampusChapterTile(chapter: chapter))
-                      .toList(),
-                );
-              },
-            ),
-          ],
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

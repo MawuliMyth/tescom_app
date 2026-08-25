@@ -18,7 +18,7 @@ class _DiscoverScreenState extends State<_DiscoverScreen> {
         child: SafeArea(
           bottom: false,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(9, 36, 9, 22),
+            padding: const EdgeInsets.fromLTRB(18, 24, 18, 12),
             children: [
               const _DiscoverTitle(),
               const SizedBox(height: 16),
@@ -28,7 +28,7 @@ class _DiscoverScreenState extends State<_DiscoverScreen> {
                 selectedFilter: selectedFilter,
                 onSelected: (value) => setState(() => selectedFilter = value),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               _DiscoverNewsList(filter: selectedFilter),
             ],
           ),
@@ -154,7 +154,7 @@ class _FilterChip extends StatelessWidget {
       onTap: onTap ?? () => _showSnack(context, '$label filter selected'),
       borderRadius: BorderRadius.circular(17),
       child: _AppSurface(
-        height: 30,
+        height: 26,
         padding: const EdgeInsets.symmetric(horizontal: 15),
         borderRadius: 17,
         opacity: selected ? 0.9 : 0.58,

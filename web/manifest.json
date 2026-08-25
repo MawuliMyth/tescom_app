@@ -1,6 +1,6 @@
 {
-    "name": "tescon_app",
-    "short_name": "tescon_app",
+    "name": "Tescon",
+    "short_name": "Tescon",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#ffffff",

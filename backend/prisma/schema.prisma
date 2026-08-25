@@ -48,75 +48,90 @@ enum ConversationRole {
 }
 
 model User {
-  id             String         @id @default(cuid())
-  email          String         @unique
-  passwordHash   String
-  fullName       String
-  phone          String?
-  institution    String?
-  avatarUrl      String?
-  bio            String?
-  organizationRole String?
-  role           UserRole       @default(USER)
-  status         UserStatus     @default(PENDING)
-  chapterId      String?
-  chapter        Chapter?       @relation(fields: [chapterId], references: [id])
-  pollVotes      PollVote[]
-  messages       Message[]
+  id                       String                    @id @default(cuid())
+  email                    String                    @unique
+  passwordHash             String
+  fullName                 String
+  phone                    String?
+  institution              String?
+  avatarUrl                String?
+  bio                      String?
+  organizationRole         String?
+  role                     UserRole                  @default(USER)
+  status                   UserStatus                @default(PENDING)
+  chapterId                String?
+  chapter                  Chapter?                  @relation(fields: [chapterId], references: [id])
+  pollVotes                PollVote[]
+  messages                 Message[]
   conversationParticipants ConversationParticipant[]
-  notifications  Notification[]
-  deviceTokens    DeviceToken[]
-  savedItems     SavedItem[]
-  refreshTokens  RefreshToken[]
-  activityLogs   ActivityLog[]
-  createdNews    NewsArticle[]  @relation("NewsCreator")
-  createdEvents  Event[]        @relation("EventCreator")
-  createdAnnouncements Announcement[] @relation("AnnouncementCreator")
-  createdJobs    Job[]          @relation("JobCreator")
-  createdPolls   Poll[]         @relation("PollCreator")
-  createdConversations Conversation[] @relation("ConversationCreator")
-  jobApplications JobApplication[]
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  notifications            Notification[]
+  deviceTokens             DeviceToken[]
+  savedItems               SavedItem[]
+  refreshTokens            RefreshToken[]
+  passwordResetTokens      PasswordResetToken[]
+  activityLogs             ActivityLog[]
+  createdNews              NewsArticle[]             @relation("NewsCreator")
+  createdEvents            Event[]                   @relation("EventCreator")
+  createdAnnouncements     Announcement[]            @relation("AnnouncementCreator")
+  createdHistory           HistoryEntry[]            @relation("HistoryCreator")
+  createdJobs              Job[]                     @relation("JobCreator")
+  createdPolls             Poll[]                    @relation("PollCreator")
+  createdConversations     Conversation[]            @relation("ConversationCreator")
+  jobApplications          JobApplication[]
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
 }
 
 model DeviceToken {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  platform  String?
-  enabled   Boolean  @default(true)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  token      String   @unique
+  platform   String?
+  enabled    Boolean  @default(true)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   lastSeenAt DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([userId])
   @@index([enabled])
 }
 
 model RefreshToken {
-  id         String    @id @default(cuid())
-  tokenHash  String    @unique
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt  DateTime
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Chapter {
-  id          String   @id @default(cuid())
-  name        String
-  campus      String
-  region      String?
-  description String?
-  logoUrl     String?
+  id             String   @id @default(cuid())
+  name           String
+  campus         String
+  region         String?
+  description    String?
+  logoUrl        String?
   memberEstimate Int?
-  members     User[]
-  events      Event[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  members        User[]
+  events         Event[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model NewsArticle {
@@ -177,22 +192,43 @@ model Announcement {
   @@index([creatorId])
 }
 
+model HistoryEntry {
+  id         String        @id @default(cuid())
+  title      String
+  summary    String?
+  body       String
+  category   String?
+  occurredAt DateTime?
+  imageUrl   String?
+  mediaUrl   String?
+  mediaType  String?
+  status     PublishStatus @default(PUBLISHED)
+  creatorId  String?
+  creator    User?         @relation("HistoryCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([creatorId])
+  @@index([status])
+  @@index([occurredAt])
+}
+
 model Job {
-  id          String        @id @default(cuid())
-  title       String
-  company     String
-  logoUrl     String?
-  location    String
-  type        String
-  description String
-  applyUrl    String?
-  deadline    DateTime?
-  status      PublishStatus @default(DRAFT)
-  creatorId   String?
-  creator     User?         @relation("JobCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  id           String           @id @default(cuid())
+  title        String
+  company      String
+  logoUrl      String?
+  location     String
+  type         String
+  description  String
+  applyUrl     String?
+  deadline     DateTime?
+  status       PublishStatus    @default(DRAFT)
+  creatorId    String?
+  creator      User?            @relation("JobCreator", fields: [creatorId], references: [id], onDelete: SetNull)
   applications JobApplication[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@index([creatorId])
 }
@@ -223,29 +259,29 @@ model JobApplication {
 }
 
 model Poll {
-  id          String        @id @default(cuid())
-  question    String
-  description String?
-  status      PublishStatus @default(DRAFT)
-  closesAt    DateTime?
-  visibility  String        @default("members")
-  allowMultipleVotes Boolean @default(false)
-  options     PollOption[]
-  votes       PollVote[]
-  creatorId   String?
-  creator     User?         @relation("PollCreator", fields: [creatorId], references: [id], onDelete: SetNull)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id                 String        @id @default(cuid())
+  question           String
+  description        String?
+  status             PublishStatus @default(DRAFT)
+  closesAt           DateTime?
+  visibility         String        @default("members")
+  allowMultipleVotes Boolean       @default(false)
+  options            PollOption[]
+  votes              PollVote[]
+  creatorId          String?
+  creator            User?         @relation("PollCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   @@index([creatorId])
 }
 
 model PollOption {
-  id      String     @id @default(cuid())
-  text    String
-  pollId  String
-  poll    Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  votes   PollVote[]
+  id     String     @id @default(cuid())
+  text   String
+  pollId String
+  poll   Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes  PollVote[]
 }
 
 model PollVote {
@@ -262,15 +298,15 @@ model PollVote {
 }
 
 model Conversation {
-  id        String    @id @default(cuid())
-  title     String
-  isGroup   Boolean   @default(true)
-  creatorId String?
-  creator   User?     @relation("ConversationCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  id           String                    @id @default(cuid())
+  title        String
+  isGroup      Boolean                   @default(true)
+  creatorId    String?
+  creator      User?                     @relation("ConversationCreator", fields: [creatorId], references: [id], onDelete: SetNull)
   participants ConversationParticipant[]
-  messages  Message[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  messages     Message[]
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
 
   @@index([creatorId])
 }
@@ -301,14 +337,14 @@ model Message {
 }
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   title     String
   body      String
-  audience  String   @default("ALL")
+  audience  String    @default("ALL")
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 }
 
 model SavedItem {

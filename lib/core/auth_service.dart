@@ -49,37 +49,51 @@ class AuthService {
   }
 
   Future<void> signInWithGoogle() async {
-    if (!await PushNotificationService.ensureFirebaseInitialized()) {
-      throw const ApiException('Firebase is not configured for this app yet');
-    }
+    try {
+      if (!await PushNotificationService.ensureFirebaseInitialized()) {
+        throw const ApiException('Firebase is not configured for this app yet');
+      }
 
-    _googleInitFuture ??= GoogleSignIn.instance.initialize();
-    await _googleInitFuture;
-    if (!GoogleSignIn.instance.supportsAuthenticate()) {
-      throw const ApiException('Google sign-in is not supported here');
-    }
+      _googleInitFuture ??= GoogleSignIn.instance.initialize();
+      await _googleInitFuture;
+      if (!GoogleSignIn.instance.supportsAuthenticate()) {
+        throw const ApiException('Google sign-in is not supported here');
+      }
 
-    final googleUser = await GoogleSignIn.instance.authenticate();
-    final googleIdToken = googleUser.authentication.idToken;
-    if (googleIdToken == null) {
-      throw const ApiException('Google did not return a sign-in token');
-    }
+      final googleUser = await GoogleSignIn.instance.authenticate();
+      final googleIdToken = googleUser.authentication.idToken;
+      if (googleIdToken == null) {
+        throw const ApiException('Google did not return a sign-in token');
+      }
 
-    final credential = GoogleAuthProvider.credential(idToken: googleIdToken);
-    final firebaseUser = await FirebaseAuth.instance.signInWithCredential(
-      credential,
-    );
-    final firebaseIdToken = await firebaseUser.user?.getIdToken();
-    if (firebaseIdToken == null) {
-      throw const ApiException('Firebase did not return a sign-in token');
-    }
+      final credential = GoogleAuthProvider.credential(idToken: googleIdToken);
+      final firebaseUser = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+      final firebaseIdToken = await firebaseUser.user?.getIdToken();
+      if (firebaseIdToken == null) {
+        throw const ApiException('Firebase did not return a sign-in token');
+      }
 
-    final data = await _apiClient.post(
-      '/api/auth/firebase',
-      auth: false,
-      body: {'idToken': firebaseIdToken},
-    );
-    await _saveTokens(data);
+      final data = await _apiClient.post(
+        '/api/auth/firebase',
+        auth: false,
+        body: {'idToken': firebaseIdToken},
+      );
+      await _saveTokens(data);
+    } on ApiException {
+      rethrow;
+    } on FirebaseAuthException catch (error) {
+      throw ApiException(_firebaseAuthMessage(error));
+    } catch (error) {
+      final message = error.toString().toLowerCase();
+      if (message.contains('cancel')) {
+        throw const ApiException('Google sign-in was cancelled.');
+      }
+      throw const ApiException(
+        'Google sign-in could not be completed. Please try again.',
+      );
+    }
   }
 
   Future<void> signUp({
@@ -110,6 +124,9 @@ class AuthService {
           ? <String, dynamic>{}
           : {'refreshToken': refreshToken};
       await _apiClient.post('/api/auth/logout', body: body);
+    } catch (error, stackTrace) {
+      debugPrint('Server logout failed, clearing local session: $error');
+      debugPrintStack(stackTrace: stackTrace);
     } finally {
       try {
         await FirebaseAuth.instance.signOut();
@@ -125,4 +142,20 @@ class AuthService {
   Future<void> _saveTokens(Map<String, dynamic> data) {
     return _tokenStorage.save(AuthTokens.fromJson(data['tokens']));
   }
+}
+
+String _firebaseAuthMessage(FirebaseAuthException error) {
+  return switch (error.code) {
+    'network-request-failed' =>
+      'Could not reach Firebase. Check your internet connection and try again.',
+    'account-exists-with-different-credential' =>
+      'An account already exists with this email. Sign in using the original method.',
+    'invalid-credential' =>
+      'Google sign-in returned invalid credentials. Please try again.',
+    'user-disabled' => 'This account has been disabled.',
+    _ =>
+      error.message?.trim().isNotEmpty == true
+          ? error.message!.trim()
+          : 'Google sign-in could not be completed. Please try again.',
+  };
 }

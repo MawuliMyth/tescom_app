@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:tescon_app/core/app_repository.dart';
 import 'package:tescon_app/core/auth_service.dart';
 import 'package:tescon_app/screens/dashboard_screen.dart';
+import 'package:tescon_app/screens/forgot_password_screen.dart';
+import 'package:tescon_app/screens/profile_completion_screen.dart';
 import 'package:tescon_app/screens/signup_screen.dart';
 
 class SiginScreen extends StatefulWidget {
@@ -43,7 +46,7 @@ class _SiginScreenState extends State<SiginScreen> {
         password: _passwordController.text,
       );
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, DashboardScreen.id);
+      await _openNextScreen();
     } catch (error) {
       if (!mounted) return;
       setState(() => _errorMessage = error.toString());
@@ -64,13 +67,29 @@ class _SiginScreenState extends State<SiginScreen> {
     try {
       await _authService.signInWithGoogle();
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, DashboardScreen.id);
+      await _openNextScreen();
     } catch (error) {
       if (!mounted) return;
       setState(() => _errorMessage = error.toString());
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  Future<void> _openNextScreen() async {
+    final user = await AppRepository().loadCurrentUser();
+    if (!mounted) return;
+    if ((user?.institution ?? '').trim().isEmpty) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProfileCompletionScreen(user: user),
+          settings: const RouteSettings(name: ProfileCompletionScreen.id),
+        ),
+      );
+      return;
+    }
+    Navigator.pushReplacementNamed(context, DashboardScreen.id);
   }
 
   @override
@@ -135,6 +154,27 @@ class _SiginScreenState extends State<SiginScreen> {
                           validator: _validateRequiredPassword,
                           onFieldSubmitted: (_) =>
                               _isSubmitting ? null : _signIn(),
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _isSubmitting
+                                ? null
+                                : () => Navigator.pushNamed(
+                                    context,
+                                    ForgotPasswordScreen.id,
+                                  ),
+                            child: Text(
+                              'Forgot password?',
+                              style: GoogleFonts.inter(
+                                color: const Color(0xFF34368C),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                          ),
                         ),
                         if (_errorMessage != null) ...[
                           const SizedBox(height: 12),

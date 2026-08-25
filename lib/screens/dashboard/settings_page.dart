@@ -13,6 +13,7 @@ class _SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<_SettingsPage> {
   bool notifications = true;
   bool biometricUnlock = false;
+  bool loggingOut = false;
   final settingsService = AppSettingsService();
   final biometricService = BiometricAuthService();
   final pushNotificationService = PushNotificationService();
@@ -75,14 +76,45 @@ class _SettingsPageState extends State<_SettingsPage> {
   }
 
   Future<void> _openChangePassword() async {
-    final changed = await showDialog<bool>(
+    await Navigator.push(
+      context,
+      _adaptivePageRoute(
+        context,
+        builder: (_) => const _ChangePasswordScreen(),
+      ),
+    );
+  }
+
+  Future<void> _logout() async {
+    if (loggingOut) return;
+    setState(() => loggingOut = true);
+
+    try {
+      await AuthService().logout();
+      await AppRepository().clearCachedSessionData();
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+      if (!mounted) return;
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).pushNamedAndRemoveUntil('signin_screen', (_) => false);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => loggingOut = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    }
+  }
+
+  Future<void> _confirmLogout() async {
+    final shouldLogout = await showModalBottomSheet<bool>(
       context: context,
-      builder: (_) => const _ChangePasswordDialog(),
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _LogoutConfirmationSheet(),
     );
-    if (!mounted || changed != true) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Password updated successfully')),
-    );
+    if (shouldLogout == true) await _logout();
   }
 
   @override
@@ -157,20 +189,115 @@ class _SettingsPageState extends State<_SettingsPage> {
                   ),
                   _SettingsValueRow(
                     icon: Icons.logout_rounded,
-                    title: 'Logout',
+                    title: loggingOut ? 'Logging out...' : 'Logout',
                     destructive: true,
-                    onTap: () async {
-                      await AuthService().logout();
-                      if (!context.mounted) return;
-                      Navigator.of(
-                        context,
-                      ).pushNamedAndRemoveUntil('signin_screen', (_) => false);
-                    },
+                    onTap: loggingOut ? null : _confirmLogout,
                   ),
                 ],
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LogoutConfirmationSheet extends StatelessWidget {
+  const _LogoutConfirmationSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.14),
+              blurRadius: 30,
+              offset: const Offset(0, 16),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFE9E9),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.logout_rounded,
+                color: Color(0xFFE54848),
+                size: 25,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Log out of Tescon?',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'You will need to sign in again to access your account.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF34368C),
+                      side: const BorderSide(color: Color(0xFFD7DAEA)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFE54848),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Log out'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -210,19 +337,20 @@ class _SettingsHeader extends StatelessWidget {
   }
 }
 
-class _ChangePasswordDialog extends StatefulWidget {
-  const _ChangePasswordDialog();
+class _ChangePasswordScreen extends StatefulWidget {
+  const _ChangePasswordScreen();
 
   @override
-  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+  State<_ChangePasswordScreen> createState() => _ChangePasswordScreenState();
 }
 
-class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+class _ChangePasswordScreenState extends State<_ChangePasswordScreen> {
   final formKey = GlobalKey<FormState>();
   final currentController = TextEditingController();
   final newController = TextEditingController();
   final confirmController = TextEditingController();
   bool saving = false;
+  bool completed = false;
   String? error;
 
   @override
@@ -246,7 +374,10 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         newPassword: newController.text,
       );
       if (!mounted) return;
-      Navigator.pop(context, true);
+      setState(() {
+        saving = false;
+        completed = true;
+      });
     } catch (exception) {
       if (!mounted) return;
       setState(() {
@@ -258,20 +389,95 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Change password'),
-      content: Form(
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F6FF),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 46,
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        _PlainIconButton(
+                          icon: Icons.arrow_back_rounded,
+                          onTap: () => Navigator.pop(context),
+                        ),
+                        const Spacer(),
+                      ],
+                    ),
+                    SizedBox(height: constraints.maxHeight * 0.08),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 260),
+                      child: completed
+                          ? _PasswordSuccessCard(
+                              key: const ValueKey('password-success'),
+                              onContinue: () => Navigator.pop(context),
+                            )
+                          : _PasswordFormCard(
+                              key: const ValueKey('password-form'),
+                              formKey: formKey,
+                              currentController: currentController,
+                              newController: newController,
+                              confirmController: confirmController,
+                              saving: saving,
+                              error: error,
+                              onSubmit: submit,
+                              onReturn: () => Navigator.pop(context),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _PasswordFormCard extends StatelessWidget {
+  const _PasswordFormCard({
+    super.key,
+    required this.formKey,
+    required this.currentController,
+    required this.newController,
+    required this.confirmController,
+    required this.saving,
+    required this.error,
+    required this.onSubmit,
+    required this.onReturn,
+  });
+
+  final GlobalKey<FormState> formKey;
+  final TextEditingController currentController;
+  final TextEditingController newController;
+  final TextEditingController confirmController;
+  final bool saving;
+  final String? error;
+  final VoidCallback onSubmit;
+  final VoidCallback onReturn;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PasswordCard(
+      icon: Icons.key_rounded,
+      title: 'Set your new password',
+      subtitle: 'Your new password should be different from your current one.',
+      child: Form(
         key: formKey,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            TextFormField(
+            _PasswordInput(
+              label: 'Current password',
               controller: currentController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Current password',
-                border: OutlineInputBorder(),
-              ),
+              textInputAction: TextInputAction.next,
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Enter your current password';
@@ -279,24 +485,19 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                 return null;
               },
             ),
-            const SizedBox(height: 12),
-            TextFormField(
+            const SizedBox(height: 16),
+            _PasswordInput(
+              label: 'New password',
               controller: newController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'New password',
-                border: OutlineInputBorder(),
-              ),
+              textInputAction: TextInputAction.next,
               validator: _validateNewPassword,
             ),
-            const SizedBox(height: 12),
-            TextFormField(
+            const SizedBox(height: 16),
+            _PasswordInput(
+              label: 'Confirm new password',
               controller: confirmController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Confirm password',
-                border: OutlineInputBorder(),
-              ),
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => saving ? null : onSubmit(),
               validator: (value) {
                 if (value != newController.text) {
                   return 'Passwords do not match';
@@ -305,9 +506,10 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
               },
             ),
             if (error != null) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 14),
               Text(
-                error!,
+                error ?? '',
+                textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   color: const Color(0xFFE54848),
                   fontSize: 12,
@@ -316,19 +518,262 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                 ),
               ),
             ],
+            const SizedBox(height: 22),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton(
+                onPressed: saving ? null : onSubmit,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF34368C),
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFECE4FF),
+                  disabledForegroundColor: const Color(0xFF8D80B5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                child: Text(
+                  saving ? 'Confirming...' : 'Confirm',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            _ReturnToSettingsButton(onTap: onReturn),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: saving ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+    );
+  }
+}
+
+class _PasswordSuccessCard extends StatelessWidget {
+  const _PasswordSuccessCard({super.key, required this.onContinue});
+
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PasswordCard(
+      icon: Icons.check_rounded,
+      title: 'Password Reset!',
+      subtitle: 'Your password has been successfully updated.',
+      child: Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton(
+              onPressed: onContinue,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF34368C),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+              child: Text(
+                'Continue',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          _ReturnToSettingsButton(onTap: onContinue),
+        ],
+      ),
+    );
+  }
+}
+
+class _PasswordCard extends StatelessWidget {
+  const _PasswordCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(maxWidth: 420),
+      padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF34368C).withValues(alpha: 0.08),
+            blurRadius: 34,
+            offset: const Offset(0, 18),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: const BoxDecoration(
+              color: Color(0xFFDCC4FF),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.black, size: 30),
+          ),
+          const SizedBox(height: 22),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              color: const Color(0xFF333333),
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              color: const Color(0xFF777777),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 24),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _PasswordInput extends StatefulWidget {
+  const _PasswordInput({
+    required this.label,
+    required this.controller,
+    this.validator,
+    this.textInputAction,
+    this.onFieldSubmitted,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final FormFieldValidator<String>? validator;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onFieldSubmitted;
+
+  @override
+  State<_PasswordInput> createState() => _PasswordInputState();
+}
+
+class _PasswordInputState extends State<_PasswordInput> {
+  bool obscure = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: widget.controller,
+      obscureText: obscure,
+      validator: widget.validator,
+      textInputAction: widget.textInputAction,
+      onFieldSubmitted: widget.onFieldSubmitted,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      style: GoogleFonts.inter(
+        color: const Color(0xFF222222),
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0,
+      ),
+      decoration: InputDecoration(
+        labelText: widget.label,
+        labelStyle: GoogleFonts.inter(
+          color: const Color(0xFF5D5D5D),
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
         ),
-        FilledButton(
-          onPressed: saving ? null : submit,
-          child: Text(saving ? 'Saving...' : 'Save'),
+        suffixIcon: IconButton(
+          tooltip: obscure ? 'Show password' : 'Hide password',
+          onPressed: () => setState(() => obscure = !obscure),
+          icon: Icon(
+            obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+            color: const Color(0xFF7C7C7C),
+            size: 20,
+          ),
         ),
-      ],
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE0E0E8)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF34368C), width: 1.4),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE54848)),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE54848), width: 1.4),
+        ),
+        errorStyle: GoogleFonts.inter(
+          color: const Color(0xFFE54848),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+        ),
+      ),
+    );
+  }
+}
+
+class _ReturnToSettingsButton extends StatelessWidget {
+  const _ReturnToSettingsButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: const Icon(Icons.arrow_back_rounded, size: 17),
+      label: const Text('Return to settings'),
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFF34368C),
+        textStyle: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0,
+        ),
+      ),
     );
   }
 }
@@ -383,9 +828,9 @@ class _SettingsProfileHeaderState extends State<_SettingsProfileHeader> {
       setState(() {
         userFuture = AppRepository().loadCurrentUser();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile photo updated')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile photo updated')));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(

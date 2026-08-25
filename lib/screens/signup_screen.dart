@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:tescon_app/core/auth_service.dart';
+import 'package:tescon_app/core/institutions.dart';
 import 'package:tescon_app/screens/dashboard_screen.dart';
+import 'package:tescon_app/screens/sigin_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   static const String id = 'signup_screen';
@@ -25,77 +27,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   bool _isSubmitting = false;
   String? _errorMessage;
-
-  final institutions = const [
-    'UG',
-    'University of Ghana',
-    'KNUST',
-    'Kwame Nkrumah University of Science and Technology',
-    'UCC',
-    'University of Cape Coast',
-    'UEW',
-    'University of Education, Winneba',
-    'UDS',
-    'University for Development Studies',
-    'UHAS',
-    'University of Health and Allied Sciences',
-    'UENR',
-    'University of Energy and Natural Resources',
-    'UMaT',
-    'University of Mines and Technology',
-    'SD Dombo University of Business and Integrated Development Studies',
-    'C. K. Tedam University of Technology and Applied Sciences',
-    'Akenten Appiah-Menka University of Skills Training and Entrepreneurial Development',
-    'UPSA',
-    'GIMPA',
-    'Ghana Communication Technology University',
-    'Ghana Institute of Journalism',
-    'Ghana Institute of Languages',
-    'Accra Technical University',
-    'Kumasi Technical University',
-    'Takoradi Technical University',
-    'Koforidua Technical University',
-    'Ho Technical University',
-    'Cape Coast Technical University',
-    'Tamale Technical University',
-    'Sunyani Technical University',
-    'Bolgatanga Technical University',
-    'Wa Technical University',
-    'Akatsi Technical Institute',
-    'Ashesi University',
-    'Central University',
-    'Valley View University',
-    'Pentecost University',
-    'Methodist University Ghana',
-    'Presbyterian University Ghana',
-    'Catholic University of Ghana',
-    'Regent University College of Science and Technology',
-    'Wisconsin International University College',
-    'Lancaster University Ghana',
-    'Academic City University College',
-    'Ghana Christian University College',
-    'African University College of Communications',
-    'BlueCrest University College',
-    'Knutsford University College',
-    'Garden City University College',
-    'Radford University College',
-    'Zenith University College',
-    'Islamic University College Ghana',
-    'All Nations University',
-    'Data Link Institute',
-    'University College of Management Studies',
-    'Perez University College',
-    'Webster University Ghana',
-    'KAAF University College',
-    'Mountcrest University College',
-    'Spiritan University College',
-    'Ensign Global College',
-    'Ghana Baptist University College',
-    'Maranatha University College',
-    'Nightingale School of Nursing',
-    'Korle Bu Nursing and Midwifery Training College',
-    '37 Military Hospital Nursing and Midwifery Training College',
-  ];
 
   @override
   void dispose() {
@@ -185,7 +116,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         const SizedBox(height: 16),
                         _InstitutionAutocomplete(
                           controller: _institutionController,
-                          institutions: institutions,
+                          institutions: ghanaInstitutions,
                           validator: _validateInstitution,
                         ),
                         const SizedBox(height: 16),
@@ -255,6 +186,43 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ),
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 28),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Already have an account?',
+                              style: GoogleFonts.poppins(
+                                color: const Color(0xFF7A7A7A),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                if (Navigator.canPop(context)) {
+                                  Navigator.pop(context);
+                                  return;
+                                }
+                                Navigator.pushReplacementNamed(
+                                  context,
+                                  SiginScreen.id,
+                                );
+                              },
+                              child: Text(
+                                'Sign In',
+                                style: GoogleFonts.inter(
+                                  color: const Color(0xFF34368C),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 32),
                       ],

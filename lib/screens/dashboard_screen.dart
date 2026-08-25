@@ -18,6 +18,7 @@ import 'package:tescon_app/core/auth_service.dart';
 import 'package:tescon_app/core/biometric_auth_service.dart';
 import 'package:tescon_app/core/push_notification_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 part 'dashboard/home_tab.dart';
 part 'dashboard/drawer.dart';

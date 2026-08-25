@@ -51,7 +51,8 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
                   final members = (snapshot.data?.users ?? const [])
                       .map(_Member.fromUser)
                       .toList();
-                  final preferredSchool = snapshot.data?.currentUser?.institution;
+                  final preferredSchool =
+                      snapshot.data?.currentUser?.institution;
                   final schools = _schoolFilterValues(
                     members,
                     preferredSchool: preferredSchool,
@@ -135,7 +136,10 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
   }
 
   // Applies search, school, and role filters to the member list.
-  List<_Member> _filterMembers(List<_Member> members, {required String school}) {
+  List<_Member> _filterMembers(
+    List<_Member> members, {
+    required String school,
+  }) {
     return members.where((member) {
       final schoolMatch = school == 'All' || member.institution == school;
       final roleMatch = selectedRole == 'All' || member.role == selectedRole;
@@ -145,7 +149,9 @@ class _MemberDirectoryPageState extends State<_MemberDirectoryPage> {
   }
 }
 
-Future<_DirectoryPeopleData> _loadPeople(Future<List<AppUser>> usersFuture) async {
+Future<_DirectoryPeopleData> _loadPeople(
+  Future<List<AppUser>> usersFuture,
+) async {
   final results = await Future.wait<Object?>([
     usersFuture,
     AppRepository().loadCurrentUser(),

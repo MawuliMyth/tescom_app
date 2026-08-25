@@ -51,52 +51,56 @@ class _JobsPageState extends State<_JobsPage> {
               ),
             ),
           ),
-          body: SafeArea(
-            top: false,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
-              children: [
-                Text(
-                  'Search internships, jobs, scholarships, national service, and youth development opportunities.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    color: const Color(0xFF777777),
-                    fontSize: 12,
-                    height: 1.35,
-                    letterSpacing: 0,
+          body: _AppScaffoldBackground(
+            child: SafeArea(
+              top: false,
+              bottom: false,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
+                children: [
+                  Text(
+                    'Search internships, jobs, scholarships, national service, and youth development opportunities.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF777777),
+                      fontSize: 12,
+                      height: 1.35,
+                      letterSpacing: 0,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                _DemoSearchField(
-                  hintText: 'Search jobs or organizations',
-                  onChanged: (value) => setState(() => query = value),
-                ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: filters.map((filter) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: _FilterChip(
-                          label: filter,
-                          selected: selectedFilter == filter,
-                          onTap: () => setState(() => selectedFilter = filter),
-                        ),
-                      );
-                    }).toList(),
+                  const SizedBox(height: 16),
+                  _DemoSearchField(
+                    hintText: 'Search jobs or organizations',
+                    onChanged: (value) => setState(() => query = value),
                   ),
-                ),
-                const SizedBox(height: 16),
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  const _ListShimmer(itemCount: 4)
-                else if (snapshot.hasError)
-                  const _InlineErrorState()
-                else if (filtered.isEmpty)
-                  const _EmptyJobsState()
-                else
-                  ...filtered.map((job) => _JobCard(job: job)),
-              ],
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: filters.map((filter) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _FilterChip(
+                            label: filter,
+                            selected: selectedFilter == filter,
+                            onTap: () =>
+                                setState(() => selectedFilter = filter),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const _ListShimmer(itemCount: 4)
+                  else if (snapshot.hasError)
+                    const _InlineErrorState()
+                  else if (filtered.isEmpty)
+                    const _EmptyJobsState()
+                  else
+                    ...filtered.map((job) => _JobCard(job: job)),
+                ],
+              ),
             ),
           ),
         );

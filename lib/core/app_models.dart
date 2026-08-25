@@ -3,6 +3,7 @@ class AppBootstrap {
     required this.news,
     required this.events,
     required this.announcements,
+    required this.history,
     required this.jobs,
     required this.chapters,
     required this.polls,
@@ -11,6 +12,7 @@ class AppBootstrap {
   final List<AppNewsArticle> news;
   final List<AppEvent> events;
   final List<AppAnnouncement> announcements;
+  final List<AppHistoryEntry> history;
   final List<AppJob> jobs;
   final List<AppChapter> chapters;
   final List<AppPoll> polls;
@@ -20,6 +22,7 @@ class AppBootstrap {
       news: _list(json['news'], AppNewsArticle.fromJson),
       events: _list(json['events'], AppEvent.fromJson),
       announcements: _list(json['announcements'], AppAnnouncement.fromJson),
+      history: _list(json['history'], AppHistoryEntry.fromJson),
       jobs: _list(json['jobs'], AppJob.fromJson),
       chapters: _list(json['chapters'], AppChapter.fromJson),
       polls: _list(json['polls'], AppPoll.fromJson),
@@ -221,6 +224,47 @@ class AppAnnouncement {
       body: json['body'] as String? ?? '',
       priority: json['priority'] as String? ?? 'normal',
       publishedAt: _date(json['publishedAt']),
+      createdAt: _date(json['createdAt']),
+    );
+  }
+}
+
+class AppHistoryEntry {
+  const AppHistoryEntry({
+    required this.id,
+    required this.title,
+    required this.body,
+    this.summary,
+    this.category,
+    this.imageUrl,
+    this.mediaUrl,
+    this.mediaType,
+    this.occurredAt,
+    this.createdAt,
+  });
+
+  final String id;
+  final String title;
+  final String body;
+  final String? summary;
+  final String? category;
+  final String? imageUrl;
+  final String? mediaUrl;
+  final String? mediaType;
+  final DateTime? occurredAt;
+  final DateTime? createdAt;
+
+  factory AppHistoryEntry.fromJson(Map<String, dynamic> json) {
+    return AppHistoryEntry(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      body: json['body'] as String? ?? '',
+      summary: json['summary'] as String?,
+      category: json['category'] as String?,
+      imageUrl: json['imageUrl'] as String?,
+      mediaUrl: json['mediaUrl'] as String?,
+      mediaType: json['mediaType'] as String?,
+      occurredAt: _date(json['occurredAt']),
       createdAt: _date(json['createdAt']),
     );
   }

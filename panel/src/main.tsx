@@ -5,6 +5,7 @@ import {
   AlertCircle,
   Bell,
   BarChart3,
+  BookOpenText,
   BriefcaseBusiness,
   CalendarDays,
   CheckCircle2,
@@ -25,6 +26,7 @@ import {
   Search,
   Send,
   Settings,
+  ShieldCheck,
   Trash2,
   UploadCloud,
   Users,
@@ -99,12 +101,14 @@ async function refreshAdminSessionOnce() {
 }
 
 type ResourceKey =
+  | "adminUsers"
   | "users"
   | "executives"
   | "chapters"
   | "news"
   | "events"
   | "announcements"
+  | "history"
   | "jobs"
   | "jobApplications"
   | "polls"
@@ -132,6 +136,8 @@ type Field = {
   label: string;
   type?: FieldType;
   options?: SelectOption[];
+  accept?: string;
+  mediaTypeKey?: string;
 };
 
 type AdminRecord = Record<string, unknown> & {
@@ -153,6 +159,8 @@ type AdminRecord = Record<string, unknown> & {
   status?: string;
   resolved?: boolean;
   imageUrl?: string;
+  mediaUrl?: string;
+  mediaType?: string;
   imageUrls?: string[];
   logoUrl?: string;
   avatarUrl?: string;
@@ -209,6 +217,10 @@ type DashboardSummary = Partial<Record<ResourceKey, AdminRecord[]>>;
 
 type ApiRowsResponse = {
   rows: AdminRecord[];
+  page?: number;
+  pageSize?: number;
+  total?: number;
+  totalPages?: number;
 };
 
 type ChapterOption = {
@@ -220,6 +232,15 @@ type ChapterOption = {
 type Notice = {
   type: "info" | "success" | "error";
   message: string;
+};
+
+type DashboardPermission = "read" | "create" | "update" | "delete" | "message" | "upload";
+type PermissionMap = Partial<Record<ResourceKey, DashboardPermission[]>>;
+type AdminSession = {
+  user: PublicUserRecord & {
+    status?: string;
+  };
+  permissions: PermissionMap;
 };
 
 const publishOptions = ["DRAFT", "PUBLISHED", "ARCHIVED"];
@@ -319,6 +340,22 @@ const institutionOptions = [
 
 const resources: Resource[] = [
   {
+    key: "adminUsers",
+    label: "Admin Users",
+    endpoint: "adminUsers",
+    icon: <ShieldCheck size={18} />,
+    fields: [
+      { key: "fullName", label: "Full name" },
+      { key: "email", label: "Email" },
+      { key: "password", label: "Password", type: "password" },
+      { key: "phone", label: "Phone" },
+      { key: "avatarUrl", label: "Profile photo", type: "image" },
+      { key: "bio", label: "Bio", type: "textarea" },
+      { key: "role", label: "Admin role", type: "select", options: ["ADMIN", "SUPER_ADMIN"] },
+      { key: "status", label: "Status", type: "select", options: ["ACTIVE", "SUSPENDED"] }
+    ]
+  },
+  {
     key: "users",
     label: "Members",
     endpoint: "users",
@@ -401,6 +438,27 @@ const resources: Resource[] = [
       { key: "priority", label: "Priority", type: "select", options: ["normal", "high", "urgent"] },
       { key: "status", label: "Status", type: "select", options: publishOptions },
       { key: "publishedAt", label: "Published at", type: "datetime-local" }
+    ]
+  },
+  {
+    key: "history",
+    label: "History",
+    endpoint: "history",
+    icon: <BookOpenText size={18} />,
+    fields: [
+      { key: "title", label: "Title" },
+      { key: "summary", label: "Summary", type: "textarea" },
+      { key: "body", label: "Body", type: "textarea" },
+      { key: "category", label: "Category" },
+      { key: "occurredAt", label: "Occurred at", type: "datetime-local" },
+      {
+        key: "mediaUrl",
+        label: "History media",
+        type: "image",
+        accept: "image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime",
+        mediaTypeKey: "mediaType"
+      },
+      { key: "status", label: "Status", type: "select", options: publishOptions }
     ]
   },
   {
@@ -717,11 +775,31 @@ function exportDashboardSummary(summary: DashboardSummary) {
   URL.revokeObjectURL(url);
 }
 
+function canAccess(permissions: PermissionMap | undefined, resourceKey: ResourceKey, permission: DashboardPermission) {
+  return Boolean(permissions?.[resourceKey]?.includes(permission));
+}
+
+function visibleResourcesFor(permissions: PermissionMap | undefined) {
+  if (!permissions) return [] as Resource[];
+  return resources.filter((resource) => canAccess(permissions, resource.key, "read"));
+}
+
+async function loadAdminSession() {
+  const response = await apiFetch("/api/admin/me");
+  const data = await response.json() as AdminSession & { message?: string };
+  if (!response.ok) throw new Error(data.message ?? "Dashboard access denied");
+  return data;
+}
+
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem("tescon_admin_token") ?? "");
   const [activeKey, setActiveKey] = useState<ActiveKey>("dashboard");
   const [globalQuery, setGlobalQuery] = useState("");
-  const active = useMemo(() => resources.find((item) => item.key === activeKey), [activeKey]);
+  const [session, setSession] = useState<AdminSession | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(Boolean(token));
+  const [sessionError, setSessionError] = useState("");
+  const visibleResources = useMemo(() => visibleResourcesFor(session?.permissions), [session?.permissions]);
+  const active = useMemo(() => visibleResources.find((item) => item.key === activeKey), [activeKey, visibleResources]);
   const pageTitle = active?.label ?? "Dashboard";
 
   useEffect(() => {
@@ -733,15 +811,52 @@ function App() {
     return () => window.removeEventListener(sessionExpiredEvent, handleSessionExpired);
   }, []);
 
+  useEffect(() => {
+    if (!token) {
+      setSession(null);
+      setSessionLoading(false);
+      return;
+    }
+    setSessionLoading(true);
+    setSessionError("");
+    loadAdminSession()
+      .then((data) => setSession(data))
+      .catch((error) => {
+        setSessionError(error instanceof Error ? error.message : "Dashboard access denied");
+        clearAdminSession();
+        setToken("");
+      })
+      .finally(() => setSessionLoading(false));
+  }, [token]);
+
+  useEffect(() => {
+    if (activeKey === "dashboard" || !session) return;
+    if (!visibleResources.some((resource) => resource.key === activeKey)) {
+      setActiveKey("dashboard");
+    }
+  }, [activeKey, session, visibleResources]);
+
   function runGlobalSearch() {
     const query = globalQuery.trim().toLowerCase();
     if (!query) return;
-    const match = resources.find((resource) => resource.label.toLowerCase().includes(query));
+    const match = visibleResources.find((resource) => resource.label.toLowerCase().includes(query));
     if (match) setActiveKey(match.key);
   }
 
   if (!token) {
-    return <Login onLogin={setToken} />;
+    return <Login onLogin={setToken} initialError={sessionError} />;
+  }
+
+  if (sessionLoading || !session) {
+    return (
+      <div className="login-page">
+        <div className="login-card">
+          <img className="login-logo" src="/logo.png" alt="TESCON" />
+          <h1>Loading dashboard</h1>
+          <TableSkeleton />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -765,7 +880,7 @@ function App() {
             Dashboard
           </button>
           <p>Content</p>
-          {resources.map((resource) => (
+          {visibleResources.map((resource) => (
             <button
               key={resource.key}
               className={resource.key === activeKey ? "active" : ""}
@@ -809,13 +924,17 @@ function App() {
             <kbd>Enter</kbd>
           </label>
           <div className="topbar-actions">
-            <IconButton icon={Bell} label="Open notifications" onClick={() => setActiveKey("notifications")} />
-            <IconButton icon={Settings} label="Open members" onClick={() => setActiveKey("users")} />
+            {canAccess(session.permissions, "notifications", "read") && (
+              <IconButton icon={Bell} label="Open notifications" onClick={() => setActiveKey("notifications")} />
+            )}
+            {canAccess(session.permissions, "users", "read") && (
+              <IconButton icon={Settings} label="Open members" onClick={() => setActiveKey("users")} />
+            )}
             <div className="admin-profile">
-              <div className="avatar">TA</div>
+              <div className="avatar">{adminInitials(session.user.fullName)}</div>
               <div>
-                <strong>TESCON Admin</strong>
-                <span>Super admin</span>
+                <strong>{session.user.fullName ?? session.user.email ?? "TESCON Admin"}</strong>
+                <span>{adminRoleLabel(session.user)}</span>
               </div>
             </div>
           </div>
@@ -833,16 +952,33 @@ function App() {
         </section>
 
         {active ? (
-          <ResourceManager key={active.key} resource={active} />
+          <ResourceManager key={active.key} resource={active} permissions={session.permissions} />
         ) : (
-          <DashboardOverview onOpenResource={setActiveKey} />
+          <DashboardOverview onOpenResource={setActiveKey} resources={visibleResources} />
         )}
       </main>
     </div>
   );
 }
 
-function DashboardOverview({ onOpenResource }: { onOpenResource: (key: ResourceKey) => void }) {
+function adminInitials(name?: string) {
+  const parts = (name ?? "TA").trim().split(/\s+/).filter(Boolean);
+  return (parts[0]?.[0] ?? "T") + (parts[1]?.[0] ?? "A");
+}
+
+function adminRoleLabel(user: AdminSession["user"]) {
+  if (user.role === "SUPER_ADMIN") return "Super admin";
+  if (user.role === "ADMIN") return "Admin";
+  return user.organizationRole ?? "Dashboard user";
+}
+
+function DashboardOverview({
+  onOpenResource,
+  resources
+}: {
+  onOpenResource: (key: ResourceKey) => void;
+  resources: Resource[];
+}) {
   const [summary, setSummary] = useState<DashboardSummary>({});
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -890,8 +1026,8 @@ function DashboardOverview({ onOpenResource }: { onOpenResource: (key: ResourceK
     };
   });
   const maxWeeklyActivity = Math.max(...weeklyActivity.map((item) => item.count), 1);
-  const contentKeys: ResourceKey[] = ["news", "events", "announcements", "jobs", "jobApplications", "polls"];
-  const communityKeys: ResourceKey[] = ["users", "executives", "chapters", "conversations"];
+  const contentKeys: ResourceKey[] = ["news", "events", "announcements", "history", "jobs", "jobApplications", "polls"];
+  const communityKeys: ResourceKey[] = ["adminUsers", "users", "executives", "chapters", "conversations"];
   const inboxKeys: ResourceKey[] = ["notifications", "contacts"];
   const distribution = {
     content: contentKeys.reduce((total, key) => total + (summary[key]?.length ?? 0), 0),
@@ -1027,10 +1163,10 @@ function DashboardOverview({ onOpenResource }: { onOpenResource: (key: ResourceK
   );
 }
 
-function Login({ onLogin }: { onLogin: (token: string) => void }) {
+function Login({ onLogin, initialError = "" }: { onLogin: (token: string) => void; initialError?: string }) {
   const [email, setEmail] = useState("admin@tescon.app");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -1070,7 +1206,7 @@ function Login({ onLogin }: { onLogin: (token: string) => void }) {
   );
 }
 
-function ResourceManager({ resource }: { resource: Resource }) {
+function ResourceManager({ resource, permissions }: { resource: Resource; permissions: PermissionMap }) {
   const [rows, setRows] = useState<AdminRecord[]>([]);
   const [chapterOptions, setChapterOptions] = useState<SelectOption[]>([]);
   const [editing, setEditing] = useState<AdminRecord | null>(null);
@@ -1083,6 +1219,10 @@ function ResourceManager({ resource }: { resource: Resource }) {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -1127,8 +1267,12 @@ function ResourceManager({ resource }: { resource: Resource }) {
     setEditorOpen(false);
     setFilters({});
     setForm(defaultFormFor(resource));
-    load();
+    setPage(1);
   }, [resource.key]);
+
+  useEffect(() => {
+    void load();
+  }, [resource.key, page, pageSize]);
 
   useEffect(() => {
     if (!resource.fields.some((field) => field.key === "chapterId")) return;
@@ -1141,9 +1285,13 @@ function ResourceManager({ resource }: { resource: Resource }) {
       field.key === "chapterId" ? { ...field, options: chapterOptions } : field
     );
   }, [chapterOptions, resource.fields]);
+  const canCreate = canAccess(permissions, resource.key, "create") && !resource.readOnly;
+  const canUpdate = canAccess(permissions, resource.key, "update") && !resource.readOnly;
+  const canDelete = canAccess(permissions, resource.key, "delete") && !resource.readOnly;
+  const canMessage = canAccess(permissions, resource.key, "message");
 
   async function request(path = "", init?: RequestInit) {
-    const listPath = !path ? "?pageSize=1000" : path;
+    const listPath = !path ? `?page=${page}&pageSize=${pageSize}` : path;
     const response = await apiFetch(`/api/admin/${resource.endpoint}${listPath}`, {
       ...init,
     });
@@ -1161,6 +1309,9 @@ function ResourceManager({ resource }: { resource: Resource }) {
     try {
       const data = await request();
       setRows(data?.rows ?? []);
+      setTotal(data?.total ?? data?.rows?.length ?? 0);
+      setTotalPages(Math.max(1, data?.totalPages ?? 1));
+      if (data?.totalPages && page > data.totalPages) setPage(data.totalPages);
       if (showNotice) setNotice(null);
     } catch (error) {
       setNotice({ type: "error", message: error instanceof Error ? error.message : "Failed to load" });
@@ -1235,7 +1386,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
       <div className="table-panel">
         <div className="table-header">
           <div>
-            <span>{rows.length} records</span>
+            <span>{total} records</span>
             <h2>{resource.label}</h2>
           </div>
           <div className="table-tools">
@@ -1248,7 +1399,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
                 </button>
               )}
             </label>
-            {!resource.readOnly && (
+            {canCreate && (
               <ActionButton icon={Plus} variant="primary" onClick={startCreate}>
                 {resourceActionLabel(resource)}
               </ActionButton>
@@ -1311,7 +1462,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
                 <tr key={row.id}>
                   <td>
                     <div className="record-title">
-                      <Thumbnail row={row} />
+                      <Thumbnail row={row} resourceKey={resource.key} />
                       <div>
                         <strong>{recordTitle(row)}</strong>
                         <span>{recordSubtitle(row)}</span>
@@ -1346,11 +1497,11 @@ function ResourceManager({ resource }: { resource: Resource }) {
                       <td><StatusPill value={row.status ?? (row.resolved ? "Resolved" : "Open")} /></td>
                       <td>{formatDate(row.updatedAt ?? row.createdAt)}</td>
                       <td className="row-actions">
-                        {resource.key === "conversations" && (
+                        {resource.key === "conversations" && canMessage && (
                           <IconButton icon={MessageSquare} label="Open chat room" tone="success" onClick={() => setActiveChat(row)} />
                         )}
-                        <IconButton icon={Pencil} label="Edit record" onClick={() => startEdit(row)} />
-                        <IconButton icon={Trash2} label="Delete record" tone="danger" onClick={() => remove(row.id)} />
+                        {canUpdate && <IconButton icon={Pencil} label="Edit record" onClick={() => startEdit(row)} />}
+                        {canDelete && <IconButton icon={Trash2} label="Delete record" tone="danger" onClick={() => remove(row.id)} />}
                       </td>
                     </>
                   )}
@@ -1362,7 +1513,7 @@ function ResourceManager({ resource }: { resource: Resource }) {
                     <EmptyState
                       title={query ? "No matching records" : resource.key === "activityLogs" ? "No activity logged yet" : "No records yet"}
                       message={query ? "Try a different search term or clear the search box." : resource.key === "activityLogs" ? "Admin actions will appear here as the team manages content." : `Use ${resourceActionLabel(resource).toLowerCase()} when you are ready to create live data.`}
-                      action={!query && !resource.readOnly ? <ActionButton icon={Plus} variant="primary" onClick={startCreate}>{resourceActionLabel(resource)}</ActionButton> : null}
+                      action={!query && canCreate ? <ActionButton icon={Plus} variant="primary" onClick={startCreate}>{resourceActionLabel(resource)}</ActionButton> : null}
                     />
                   </td>
                 </tr>
@@ -1371,6 +1522,20 @@ function ResourceManager({ resource }: { resource: Resource }) {
           </table>
           )}
         </div>
+        {!loading && (
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            totalPages={totalPages}
+            shown={filteredRows.length}
+            onPageChange={setPage}
+            onPageSizeChange={(nextPageSize) => {
+              setPageSize(nextPageSize);
+              setPage(1);
+            }}
+          />
+        )}
       </div>
       {editorOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -1398,6 +1563,8 @@ function ResourceManager({ resource }: { resource: Resource }) {
                     field={field}
                     value={form[field.key]}
                     onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
+                    form={form}
+                    onFormChange={(updates) => setForm((current) => ({ ...current, ...updates }))}
                   />
                 ))}
               </div>
@@ -1432,14 +1599,69 @@ function SaveIcon() {
   return <UploadCloud size={16} />;
 }
 
+function PaginationBar({
+  page,
+  pageSize,
+  total,
+  totalPages,
+  shown,
+  onPageChange,
+  onPageSizeChange
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  shown: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+}) {
+  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(total, (page - 1) * pageSize + shown);
+
+  return (
+    <div className="pagination-bar">
+      <div>
+        <strong>{start}-{end}</strong>
+        <span>of {total} records</span>
+      </div>
+      <label>
+        Rows
+        <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))}>
+          {[10, 25, 50, 100].map((size) => (
+            <option key={size} value={size}>{size}</option>
+          ))}
+        </select>
+      </label>
+      <div className="pagination-actions">
+        <IconButton
+          icon={ChevronLeft}
+          label="Previous page"
+          disabled={page <= 1}
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+        />
+        <span>Page {page} of {totalPages}</span>
+        <IconButton
+          icon={ChevronRight}
+          label="Next page"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+        />
+      </div>
+    </div>
+  );
+}
+
 function primaryColumnLabel(resource: Resource) {
   const labels: Partial<Record<ResourceKey, string>> = {
+    adminUsers: "Admin",
     users: "Member",
     executives: "Executive",
     chapters: "Chapter",
     news: "News title",
     events: "Event title",
     announcements: "Announcement",
+    history: "History entry",
     jobs: "Job title",
     jobApplications: "Applicant",
     polls: "Poll question",
@@ -1461,12 +1683,14 @@ function emptyColumnCount(resource: Resource) {
 
 function resourceActionLabel(resource: Resource) {
   const labels: Partial<Record<ResourceKey, string>> = {
+    adminUsers: "Create Admin",
     users: "Add Member",
     executives: "Create Executive",
     chapters: "Create Chapter",
     news: "Create News",
     events: "Create Event",
     announcements: "Create Announcement",
+    history: "Create History",
     jobs: "Post Job",
     jobApplications: "Add Applicant",
     polls: "Create Poll",
@@ -1771,6 +1995,7 @@ function LogDetail({ label, value, wide = false }: { label: string; value: strin
 function filterValueFor(row: AdminRecord, key: string) {
   if (key === "campus") return String(row.institution ?? row.name ?? row.job?.institution ?? "");
   if (key === "position") return String(row.organizationRole ?? "");
+  if (key === "role") return String(row.role ?? "");
   if (key === "status") return String(row.status ?? (row.resolved ? "Resolved" : "Open"));
   if (key === "type") return String(row.type ?? "");
   if (key === "company") return String(row.company ?? row.job?.company ?? "");
@@ -1782,6 +2007,7 @@ function filterValueFor(row: AdminRecord, key: string) {
 
 function buildFilters(resource: Resource, rows: AdminRecord[]) {
   const keysByResource: Partial<Record<ResourceKey, { key: string; label: string }[]>> = {
+    adminUsers: [{ key: "role", label: "Admin role" }, { key: "status", label: "Status" }],
     users: [{ key: "campus", label: "Campus / school" }, { key: "position", label: "Role" }, { key: "status", label: "Status" }],
     executives: [{ key: "campus", label: "Campus / school" }, { key: "position", label: "Position" }, { key: "status", label: "Status" }],
     chapters: [{ key: "campus", label: "Campus / school" }],
@@ -1829,11 +2055,15 @@ function statusTone(value: string) {
 function FieldInput({
   field,
   value,
-  onChange
+  onChange,
+  form,
+  onFormChange
 }: {
   field: Field;
   value: unknown;
   onChange: (value: unknown) => void;
+  form: Record<string, unknown>;
+  onFormChange: (updates: Record<string, unknown>) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -1857,6 +2087,9 @@ function FieldInput({
       if (!response.ok) throw new Error(data.message ?? "Upload failed");
       if (!data.url) throw new Error("Upload did not return an image URL");
       onChange(data.url);
+      if (field.mediaTypeKey) {
+        onFormChange({ [field.mediaTypeKey]: file.type.startsWith("video/") ? "video" : "image" });
+      }
       if (inputRef.current) inputRef.current.value = "";
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "Upload failed");
@@ -1986,6 +2219,9 @@ function FieldInput({
 
   if (field.type === "image") {
     const preview = resolveAssetUrl(typeof value === "string" ? value : undefined);
+    const mediaType = field.mediaTypeKey ? String(form[field.mediaTypeKey] ?? "") : "";
+    const isVideo = mediaType.startsWith("video") || /\.(mp4|webm|mov)(\?|$)/i.test(preview);
+    const acceptedTypes = field.accept ?? "image/png,image/jpeg,image/webp,image/gif";
     return (
       <div className="span-2 image-field">
         <span className="field-label">{field.label}</span>
@@ -2007,13 +2243,17 @@ function FieldInput({
             <input
               ref={inputRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
+              accept={acceptedTypes}
               onChange={(event) => uploadFile(event.target.files?.[0])}
             />
 
             {preview ? (
               <div className="upload-preview">
-                <img src={preview} alt="" />
+                {isVideo ? (
+                  <video src={preview} controls preload="metadata" />
+                ) : (
+                  <img src={preview} alt="" />
+                )}
               </div>
             ) : (
               <div className="upload-empty">
@@ -2026,7 +2266,7 @@ function FieldInput({
                     browse
                   </button>
                 </strong>
-                <span>Supports: JPG, JPEG, WEBP, GIF, PNG</span>
+                <span>{field.accept?.includes("video") ? "Supports: JPG, JPEG, WEBP, GIF, PNG, MP4, WEBM, MOV" : "Supports: JPG, JPEG, WEBP, GIF, PNG"}</span>
               </div>
             )}
           </div>
@@ -2044,6 +2284,9 @@ function FieldInput({
                   className="danger"
                   onClick={() => {
                     onChange(null);
+                    if (field.mediaTypeKey) {
+                      onFormChange({ [field.mediaTypeKey]: "" });
+                    }
                     setUploadError("");
                     if (inputRef.current) inputRef.current.value = "";
                   }}
@@ -2365,11 +2608,19 @@ function formatTimeLabel(value: string) {
   });
 }
 
-function Thumbnail({ row }: { row: AdminRecord }) {
+function Thumbnail({ row, resourceKey }: { row: AdminRecord; resourceKey?: ResourceKey }) {
+  const mediaResourceKeys: ResourceKey[] = ["adminUsers", "users", "executives", "chapters", "news", "events", "history", "jobs"];
   const galleryImage = Array.isArray(row.imageUrls) ? row.imageUrls[0] : undefined;
-  const source = resolveAssetUrl(galleryImage ?? row.imageUrl ?? row.logoUrl ?? row.avatarUrl);
+  const source = resolveAssetUrl(galleryImage ?? row.mediaUrl ?? row.imageUrl ?? row.logoUrl ?? row.avatarUrl);
   if (!source) {
-    return <div className="thumbnail"><ImageIcon size={15} /></div>;
+    return null;
+  }
+
+  const isVideo = String(row.mediaType ?? "").startsWith("video") || /\.(mp4|webm|mov)(\?|$)/i.test(source);
+  if (isVideo) {
+    return mediaResourceKeys.includes(resourceKey ?? "history") ? (
+      <div className="thumbnail thumbnail-media"><FileText size={15} /></div>
+    ) : null;
   }
 
   return (
@@ -2385,7 +2636,7 @@ function resolveAssetUrl(value?: string) {
 }
 
 function normalizePayload(form: Record<string, unknown>, fields: Field[]) {
-  return fields.reduce<Record<string, unknown>>((payload, field) => {
+  const payload = fields.reduce<Record<string, unknown>>((payload, field) => {
     const value = form[field.key];
     if (field.type === "image-list") {
       payload[field.key] = Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
@@ -2406,9 +2657,18 @@ function normalizePayload(form: Record<string, unknown>, fields: Field[]) {
     payload[field.key] = field.type === "datetime-local" && typeof value === "string" ? new Date(value).toISOString() : value;
     return payload;
   }, {});
+
+  if (fields.some((field) => field.key === "mediaUrl")) {
+    const mediaUrl = payload.mediaUrl;
+    if (typeof mediaUrl === "string" && !payload.imageUrl) payload.imageUrl = mediaUrl;
+    if (payload.mediaUrl === null) payload.imageUrl = null;
+  }
+
+  return payload;
 }
 
 function defaultFormFor(resource: Resource) {
+  if (resource.key === "adminUsers") return { role: "ADMIN", status: "ACTIVE" };
   if (resource.key === "polls") return { status: "PUBLISHED", options: "Yes\nNo" };
   if (resource.key === "notifications") return { audience: "ALL" };
   return resource.key === "events" ? { status: "PUBLISHED" } : {};
@@ -2428,7 +2688,7 @@ function toEditableForm(row: AdminRecord, fields: Field[]) {
     } else if (field.type === "datetime-local" && typeof value === "string") {
       form[field.key] = new Date(value).toISOString().slice(0, 16);
     } else if (field.key !== "password") {
-      form[field.key] = value ?? "";
+      form[field.key] = value ?? (field.key === "mediaUrl" ? row.imageUrl ?? "" : "");
     }
     return form;
   }, {});

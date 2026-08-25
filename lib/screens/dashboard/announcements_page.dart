@@ -41,31 +41,25 @@ class _AnnouncementsPageState extends State<_AnnouncementsPage> {
         centerTitle: true,
         elevation: 0,
         foregroundColor: Colors.black,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset('assets/images/logo.png', height: 30),
-            const SizedBox(width: 8),
-            Text(
-              'Announcements',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0,
-              ),
-            ),
-          ],
+        title: Text(
+          'Announcements',
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+          ),
         ),
       ),
       body: _AppScaffoldBackground(
         child: SafeArea(
           top: false,
+          bottom: false,
           child: FutureBuilder<AppBootstrap>(
             future: announcementsFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Padding(
-                  padding: EdgeInsets.fromLTRB(18, 18, 18, 28),
+                  padding: EdgeInsets.fromLTRB(18, 18, 18, 12),
                   child: _ListShimmer(itemCount: 4),
                 );
               }
@@ -78,22 +72,20 @@ class _AnnouncementsPageState extends State<_AnnouncementsPage> {
                 child: announcements.isEmpty
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
                         children: const [_AnnouncementEmptyState()],
                       )
                     : ListView.separated(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
                         itemCount: announcements.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final announcement = announcements[index];
                           return _AnnouncementTile(
                             item: announcement,
-                            onTap: () => _openAnnouncement(
-                              context,
-                              announcement,
-                            ),
+                            onTap: () =>
+                                _openAnnouncement(context, announcement),
                           );
                         },
                       ),
@@ -151,10 +143,10 @@ class _AnnouncementTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(13),
               ),
               child: Icon(
-                urgent
-                    ? Icons.priority_high_rounded
-                    : Icons.campaign_outlined,
-                color: urgent ? const Color(0xFFE5484D) : const Color(0xFF34368C),
+                urgent ? Icons.priority_high_rounded : Icons.campaign_outlined,
+                color: urgent
+                    ? const Color(0xFFE5484D)
+                    : const Color(0xFF34368C),
               ),
             ),
             const SizedBox(width: 12),
@@ -220,8 +212,8 @@ class _AnnouncementPriorityPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final urgent = priority.toLowerCase() == 'urgent' ||
-        priority.toLowerCase() == 'high';
+    final urgent =
+        priority.toLowerCase() == 'urgent' || priority.toLowerCase() == 'high';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -263,14 +255,6 @@ class _AnnouncementDetailSheet extends StatelessWidget {
                   color: const Color(0xFFE2E8F0),
                   borderRadius: BorderRadius.circular(999),
                 ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Center(
-              child: Image.asset(
-                'assets/images/logo.png',
-                height: 58,
-                fit: BoxFit.contain,
               ),
             ),
             const SizedBox(height: 18),

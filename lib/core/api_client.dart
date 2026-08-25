@@ -99,6 +99,14 @@ class ApiClient {
       throw const ApiException(
         'The upload is taking longer than expected. Please try again.',
       );
+    } on http.ClientException {
+      throw const ApiException(
+        'Could not connect to the server. Check your internet connection and try again.',
+      );
+    } on FormatException {
+      throw const ApiException(
+        'The server returned an unexpected response. Please try again.',
+      );
     }
   }
 
@@ -150,6 +158,10 @@ class ApiClient {
       throw const ApiException(
         'The server is taking longer than expected. Please try again.',
       );
+    } on http.ClientException {
+      throw const ApiException(
+        'Could not connect to the server. Check your internet connection and try again.',
+      );
     }
 
     if (auth && response.statusCode == 401 && !retrying) {
@@ -192,23 +204,105 @@ class ApiClient {
         await _tokenStorage.clear();
       }
       rethrow;
+    } on TimeoutException {
+      throw const ApiException(
+        'The server is taking longer than expected. Please try again.',
+      );
+    } on http.ClientException {
+      throw const ApiException(
+        'Could not connect to the server. Check your internet connection and try again.',
+      );
     }
   }
 
   Map<String, dynamic> _decode(http.Response response) {
-    final data = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body) as Map<String, dynamic>;
+    final Map<String, dynamic> data;
+    try {
+      data = response.body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(response.body) as Map<String, dynamic>;
+    } on FormatException {
+      throw const ApiException(
+        'The server returned an unexpected response. Please try again.',
+      );
+    }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw ApiException(
-        data['message'] as String? ?? 'Request failed',
+        _errorMessageFrom(data, response.statusCode),
         statusCode: response.statusCode,
       );
     }
 
     return data;
   }
+}
+
+String _errorMessageFrom(Map<String, dynamic> data, int statusCode) {
+  final rawMessage = data['message'];
+  final message = rawMessage is String ? rawMessage.trim() : '';
+  final issues = data['issues'];
+  final issueMessage = _issuesMessage(issues);
+  if (issueMessage != null) return issueMessage;
+  if (message.isNotEmpty && message.toLowerCase() != 'something went wrong') {
+    return message;
+  }
+
+  return switch (statusCode) {
+    400 => 'Please check the information you entered and try again.',
+    401 => 'Your email or password is incorrect.',
+    403 => 'You do not have permission to perform this action.',
+    404 => 'The requested information was not found.',
+    409 => 'This information already exists. Please use a different value.',
+    413 => 'The file is too large. Please choose a smaller file.',
+    422 => 'Some information is invalid. Please review and try again.',
+    429 => 'Too many attempts. Please wait a moment and try again.',
+    >= 500 => 'The server had a problem. Please try again shortly.',
+    _ => 'Request failed. Please try again.',
+  };
+}
+
+String? _issuesMessage(dynamic issues) {
+  if (issues is! List || issues.isEmpty) return null;
+
+  final messages = issues
+      .whereType<Map>()
+      .map((issue) {
+        final field = _fieldName(issue['path']);
+        final message = issue['message'];
+        if (message is! String || message.trim().isEmpty) return null;
+        return field == null ? message.trim() : '$field: ${message.trim()}';
+      })
+      .whereType<String>()
+      .take(3)
+      .toList(growable: false);
+
+  if (messages.isEmpty) return null;
+  return messages.join('\n');
+}
+
+String? _fieldName(dynamic path) {
+  if (path is! List || path.isEmpty) return null;
+  final raw = path.last?.toString();
+  if (raw == null || raw.isEmpty) return null;
+  return switch (raw) {
+    'fullName' => 'Full name',
+    'email' => 'Email',
+    'password' => 'Password',
+    'phone' => 'Phone number',
+    'institution' => 'Institution',
+    'confirmPassword' => 'Confirm password',
+    _ =>
+      raw
+          .replaceAllMapped(
+            RegExp(r'([A-Z])'),
+            (match) => ' ${match.group(1)!.toLowerCase()}',
+          )
+          .replaceFirstMapped(
+            RegExp(r'^.'),
+            (match) => match.group(0)!.toUpperCase(),
+          ),
+  };
 }
 
 MediaType _mediaType(String value) {

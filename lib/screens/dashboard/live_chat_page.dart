@@ -83,43 +83,58 @@ class _LiveChatPageState extends State<_LiveChatPage> {
           ),
         ],
       ),
-      body: FutureBuilder<List<AppConversation>>(
-        future: conversationsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const _ChatListShimmer(itemCount: 6);
-          }
-          if (snapshot.hasError) return const _InlineErrorState();
+      body: _AppScaffoldBackground(
+        child: SafeArea(
+          top: false,
+          bottom: false,
+          child: FutureBuilder<List<AppConversation>>(
+            future: conversationsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const _ChatListShimmer(itemCount: 6);
+              }
+              if (snapshot.hasError) return const _InlineErrorState();
 
-          final conversations = snapshot.data ?? const [];
-          if (conversations.isEmpty) {
-            return RefreshIndicator.noSpinner(
-              onRefresh: refresh,
-              child: const SingleChildScrollView(
-                physics: AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  height: 420,
-                  child: _ChatEmptyState(
-                    title: 'No chats yet',
-                    message: 'Create a chat to start a conversation.',
+              final conversations = snapshot.data ?? const [];
+              if (conversations.isEmpty) {
+                return RefreshIndicator.noSpinner(
+                  onRefresh: refresh,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: const _ChatEmptyState(
+                            title: 'No chats yet',
+                            message: 'Create a chat to start a conversation.',
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ),
-              ),
-            );
-          }
+                );
+              }
 
-          return RefreshIndicator.noSpinner(
-            onRefresh: refresh,
-            child: ListView.separated(
-              physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: conversations.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                return _ConversationTile(conversation: conversations[index]);
-              },
-            ),
-          );
-        },
+              return RefreshIndicator.noSpinner(
+                onRefresh: refresh,
+                child: ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  itemCount: conversations.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    return _ConversationTile(
+                      conversation: conversations[index],
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
